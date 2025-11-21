@@ -93,6 +93,13 @@ export default function HomePage() {
     airline: "",
     flightNumber: "",
   })
+  const [persistedSearchParams, setPersistedSearchParams] = useState({
+    origin: "",
+    destination: "",
+    date: "",
+    airline: "",
+    flightNumber: "",
+  })
 
   const deckConfig: DeckConfiguration = {
     width: 6,
@@ -393,6 +400,13 @@ export default function HomePage() {
     setShowSearch(false)
     setHasSearched(false)
     setSelectedFlightForSeatMap(null)
+    setSearchParams({
+      origin: "",
+      destination: "",
+      date: "",
+      airline: "",
+      flightNumber: "",
+    })
   }
   
   if (lastPathname !== pathname) {
@@ -449,6 +463,7 @@ export default function HomePage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setPersistedSearchParams(searchParams)
     setHasSearched(true)
   }
 
@@ -782,43 +797,79 @@ export default function HomePage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Flight Search Results</h1>
             <p className="text-gray-600">
-              {searchParams.origin} → {searchParams.destination} • {searchParams.date}
+              {persistedSearchParams.origin} → {persistedSearchParams.destination} • {persistedSearchParams.date}
             </p>
           </div>
 
-          <div className="bg-gray-50 rounded-2xl p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <form onSubmit={handleSearch} className="bg-gray-50 rounded-2xl p-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div>
-                <label className="text-sm text-gray-600 mb-2 block">From</label>
-                <div className="bg-white rounded-lg px-4 py-3 border border-gray-200">
-                  <div className="font-medium">{searchParams.origin}</div>
-                </div>
+                <Label htmlFor="results-origin" className="text-sm text-gray-600 mb-2 block">From</Label>
+                <Input
+                  id="results-origin"
+                  type="text"
+                  placeholder="Airport code or city"
+                  value={searchParams.origin}
+                  onChange={(e) => setSearchParams({ ...searchParams, origin: e.target.value })}
+                  className="bg-white rounded-lg border-gray-200"
+                  required
+                />
               </div>
               <div>
-                <label className="text-sm text-gray-600 mb-2 block">To</label>
-                <div className="bg-white rounded-lg px-4 py-3 border border-gray-200">
-                  <div className="font-medium">{searchParams.destination}</div>
-                </div>
+                <Label htmlFor="results-destination" className="text-sm text-gray-600 mb-2 block">To</Label>
+                <Input
+                  id="results-destination"
+                  type="text"
+                  placeholder="Airport code or city"
+                  value={searchParams.destination}
+                  onChange={(e) => setSearchParams({ ...searchParams, destination: e.target.value })}
+                  className="bg-white rounded-lg border-gray-200"
+                  required
+                />
               </div>
               <div>
-                <label className="text-sm text-gray-600 mb-2 block">Date</label>
-                <div className="bg-white rounded-lg px-4 py-3 border border-gray-200">
-                  <div className="font-medium">{searchParams.date}</div>
-                </div>
+                <Label htmlFor="results-date" className="text-sm text-gray-600 mb-2 block">Date</Label>
+                <Input
+                  id="results-date"
+                  type="date"
+                  value={searchParams.date}
+                  onChange={(e) => setSearchParams({ ...searchParams, date: e.target.value })}
+                  className="bg-white rounded-lg border-gray-200"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="results-airline" className="text-sm text-gray-600 mb-2 block">Airline</Label>
+                <Input
+                  id="results-airline"
+                  type="text"
+                  placeholder="e.g., AA, DL, UA"
+                  value={searchParams.airline}
+                  onChange={(e) => setSearchParams({ ...searchParams, airline: e.target.value })}
+                  className="bg-white rounded-lg border-gray-200"
+                />
+              </div>
+              <div>
+                <Label htmlFor="results-flight" className="text-sm text-gray-600 mb-2 block">Flight #</Label>
+                <Input
+                  id="results-flight"
+                  type="text"
+                  placeholder="e.g., 1234"
+                  value={searchParams.flightNumber}
+                  onChange={(e) => setSearchParams({ ...searchParams, flightNumber: e.target.value })}
+                  className="bg-white rounded-lg border-gray-200"
+                />
               </div>
               <div className="flex items-end">
                 <Button
-                  onClick={() => {
-                    setHasSearched(false)
-                    setShowSearch(false)
-                  }}
+                  type="submit"
                   className="w-full bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer"
                 >
-                  New Search
+                  Update Search
                 </Button>
               </div>
             </div>
-          </div>
+          </form>
 
           <div className="mb-6">
             <p className="text-sm text-gray-600">{flights.length} flights found</p>

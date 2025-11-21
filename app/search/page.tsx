@@ -292,14 +292,6 @@ export default function SearchPage() {
     // Fetch flights from API
     await fetchFlights(searchApiParams)
 
-    setFormInputs({
-      origin: "",
-      destination: "",
-      date: "",
-      airline: "",
-      flightNumber: "",
-      seatClass: "",
-    })
     setIsSearchFormExpanded(false)
   }
 
@@ -316,6 +308,20 @@ export default function SearchPage() {
       seatClass: "",
     })
   }
+
+  // Populate form inputs with URL parameters when available
+  React.useEffect(() => {
+    if (from || to || date || airline || flightNumber || seatClass) {
+      setFormInputs({
+        origin: from || "",
+        destination: to || "",
+        date: date || "",
+        airline: airline || "",
+        flightNumber: flightNumber || "",
+        seatClass: seatClass || "",
+      })
+    }
+  }, [from, to, date, airline, flightNumber, seatClass])
 
   // Fetch flights on initial page load if search parameters are present
   React.useEffect(() => {
