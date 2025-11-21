@@ -8,8 +8,8 @@ import { Footer } from "@/components/footer"
 import { ScrollToTop } from "@/components/scroll-to-top"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "myseatmap",
+  description: "Track airline seat availability and get real-time seat maps",
   generator: "v0.app",
 }
 

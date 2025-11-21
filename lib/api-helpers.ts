@@ -15,7 +15,10 @@ export interface FlightOffersAPIPayload {
   origin: string
   destination: string
   departureDate: string
+  travelClass?: string
   flightNumber?: string
+  maxResults?: number
+  includeRawFlightOffer?: boolean
 }
 
 /**
@@ -55,16 +58,23 @@ export function prepareFlightSearchPayload(params: FlightSearchParams): FlightOf
     origin,
     destination,
     departureDate,
+    maxResults: 10, // Set to 10 as requested
+    includeRawFlightOffer: false, // Don't need raw data for frontend
   }
 
   // Handle optional flightNumber field
-  // If both airline and flightNumber are provided, combine them (e.g., "AA" + "1234" = "AA1234")
-  // If only flightNumber is provided, use it as-is
-  // If neither is provided, omit the field
+  // Backend expects flightNumber to be either airline code (e.g., "UA") or full flight number (e.g., "UA1679")
   if (params.airline && params.flightNumber) {
+    // Both airline and flight number provided: combine them (e.g., "UA" + "1679" = "UA1679")
     payload.flightNumber = `${params.airline.trim().toUpperCase()}${params.flightNumber.trim()}`
+    payload.maxResults = 3 // Specific flight search, get a few results
+  } else if (params.airline) {
+    // Only airline provided: use airline code as filter (e.g., "UA")
+    payload.flightNumber = params.airline.trim().toUpperCase()
   } else if (params.flightNumber) {
+    // Only flight number provided: use as-is
     payload.flightNumber = params.flightNumber.trim().toUpperCase()
+    payload.maxResults = 3 // Specific flight search, get a few results
   }
 
   return payload
@@ -120,6 +130,8 @@ export interface Flight {
   date: string
   availableSeats: number
   price: string
+  stops: number
+  connections: string[]
 }
 
 /**

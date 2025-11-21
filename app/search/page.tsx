@@ -1,14 +1,17 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import React, { useState } from "react"
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plane, MapPin, Bell, Search, ArrowLeft, Calendar, Clock, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plane, MapPin, Bell, Search, ArrowLeft, Calendar, Clock, Users, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react'
+import { 
+  type FlightSearchParams,
+  type Flight 
+} from "@/lib/api-helpers"
 import {
   Dialog,
   DialogContent,
@@ -67,6 +70,11 @@ export default function SearchPage() {
   const [showAlertSuccess, setShowAlertSuccess] = useState(false)
   const [isSearchAlertDialogOpen, setIsSearchAlertDialogOpen] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<FlightAlertDetails | null>(null) // State to hold details for the flight alert dialog
+  
+  // API integration state
+  const [flights, setFlights] = useState<Flight[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const [availabilityThreshold, setAvailabilityThreshold] = useState<number>(30)
   const [seatCountThreshold, setSeatCountThreshold] = useState<number>(30)
@@ -249,7 +257,7 @@ export default function SearchPage() {
     "31F": "AVAILABLE",
   }
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
 
     const params = new URLSearchParams()
@@ -270,18 +278,19 @@ export default function SearchPage() {
     }
 
     // Update search params and navigate
-    const newParams = {
+    router.push(`/search?${params.toString()}`)
+
+    // Prepare API search parameters
+    const searchApiParams: FlightSearchParams = {
       origin: formInputs.origin,
       destination: formInputs.destination,
       date: formInputs.date,
-      airline: formInputs.airline,
-      flightNumber: formInputs.flightNumber,
-      seatClass: formInputs.seatClass,
+      airline: formInputs.airline || undefined,
+      flightNumber: formInputs.flightNumber || undefined,
     }
 
-    setSearchParams(newParams)
-    setHasSearched(true)
-    router.push(`/search?${params.toString()}`)
+    // Fetch flights from API
+    await fetchFlights(searchApiParams)
 
     setFormInputs({
       origin: "",
@@ -296,15 +305,8 @@ export default function SearchPage() {
 
   const handleNewSearch = () => {
     router.push("/search")
-    setHasSearched(false)
-    setSearchParams({
-      origin: "",
-      destination: "",
-      date: "",
-      airline: "",
-      flightNumber: "",
-      seatClass: "",
-    })
+    setFlights([]) // Clear flights
+    setError(null) // Clear any errors
     setFormInputs({
       origin: "",
       destination: "",
@@ -314,6 +316,20 @@ export default function SearchPage() {
       seatClass: "",
     })
   }
+
+  // Fetch flights on initial page load if search parameters are present
+  React.useEffect(() => {
+    if (hasSearched && from && to && date) {
+      const searchApiParams: FlightSearchParams = {
+        origin: from,
+        destination: to,
+        date,
+        airline: airline || undefined,
+        flightNumber: flightNumber || undefined,
+      }
+      fetchFlights(searchApiParams)
+    }
+  }, [hasSearched, from, to, date, airline, flightNumber]) // Re-run when URL params change
 
   const getSeatStatus = (row: number, col: number): SeatStatus => {
     if (deckConfig.exitRowsX.includes(row)) {
@@ -338,65 +354,165 @@ export default function SearchPage() {
     return letters[col] || ""
   }
 
-  const flights = [
-    {
-      id: 1,
-      airline: "American Airlines",
-      flightNumber: "AA 1234",
-      departure: { city: searchParams.origin, code: searchParams.origin, time: "08:00 AM" },
-      arrival: { city: searchParams.destination, code: searchParams.destination, time: "04:30 PM" },
-      duration: "5h 30m",
-      date: (() => {
-        const [year, month, day] = searchParams.date.split("-").map(Number)
-        return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
+  // Fetch flights from local API route
+  const fetchFlights = async (searchParams: FlightSearchParams): Promise<void> => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      // Make API call to local Next.js API route
+      const response = await fetch('/api/flight-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(searchParams),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      if (data.success && data.data) {
+        console.log('Transforming API response:', {
+          hasData: !!data.data,
+          dataType: Array.isArray(data.data) ? 'array' : typeof data.data,
+          dataLength: Array.isArray(data.data) ? data.data.length : 'not array',
+          sampleKeys: data.data?.[0] ? Object.keys(data.data[0]) : 'no sample',
+          fullStructure: {
+            hasDataArray: !!data.data.data,
+            dataArrayLength: Array.isArray(data.data.data) ? data.data.data.length : 'not array',
+            hasDictionaries: !!data.data.dictionaries,
+            sampleFlightKeys: data.data.data?.[0] ? Object.keys(data.data.data[0]) : 'no sample flight'
+          }
+        });
+        
+        try {
+          // Transform backend response to frontend format
+          // Backend returns { data: [flight1, flight2, ...], meta: {}, dictionaries: {} }
+          // We need to convert each flight object to our frontend Flight type
+          const backendFlights = data.data.data || []; // Array of flight objects from backend
+          const dictionaries = data.data.dictionaries || {}; // Carrier code to name mapping
+          
+          console.log('About to transform flights:', {
+            backendFlightsCount: backendFlights.length,
+            firstFlight: backendFlights[0] ? {
+              hasItineraries: !!backendFlights[0].itineraries,
+              itinerariesLength: backendFlights[0].itineraries?.length,
+              firstSegment: backendFlights[0].itineraries?.[0]?.segments?.[0] ? {
+                carrierCode: backendFlights[0].itineraries[0].segments[0].carrierCode,
+                number: backendFlights[0].itineraries[0].segments[0].number,
+                departure: backendFlights[0].itineraries[0].segments[0].departure?.iataCode,
+                arrival: backendFlights[0].itineraries[0].segments[0].arrival?.iataCode
+              } : 'no segment'
+            } : 'no flight'
+          });
+          
+          const transformedFlights = backendFlights.map((flight: Record<string, unknown>, index: number) => {
+          const carrierCode = flight.itineraries?.[0]?.segments?.[0]?.carrierCode || '';
+          const flightNum = flight.itineraries?.[0]?.segments?.[0]?.number || '';
+          const airlineName = dictionaries.carriers?.[carrierCode] || carrierCode || 'Unknown';
+          
+          return {
+            id: index + 1,
+            airline: airlineName,
+            flightNumber: `${carrierCode} ${flightNum}`.trim(),
+          departure: {
+            // Use first segment departure (origin)
+            city: (() => {
+              const departureCode = flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode;
+              // If dictionaries has location info, use cityCode, otherwise just use the airport code
+              return dictionaries?.locations?.[departureCode]?.cityCode || departureCode || '';
+            })(),
+            code: flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode || '',
+            time: flight.itineraries?.[0]?.segments?.[0]?.departure?.at ? 
+              new Date(flight.itineraries[0].segments[0].departure.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit', 
+                hour12: true
+              }) : ''
+          },
+          arrival: {
+            // Use last segment arrival (final destination)
+            city: (() => {
+              const segments = flight.itineraries?.[0]?.segments || [];
+              const lastSegment = segments[segments.length - 1];
+              const arrivalCode = lastSegment?.arrival?.iataCode;
+              return dictionaries.locations?.[arrivalCode]?.cityCode || arrivalCode || '';
+            })(),
+            code: (() => {
+              const segments = flight.itineraries?.[0]?.segments || [];
+              const lastSegment = segments[segments.length - 1];
+              return lastSegment?.arrival?.iataCode || '';
+            })(),
+            time: (() => {
+              const segments = flight.itineraries?.[0]?.segments || [];
+              const lastSegment = segments[segments.length - 1];
+              return lastSegment?.arrival?.at ?
+                new Date(lastSegment.arrival.at).toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true  
+                }) : '';
+            })()
+          },
+          duration: flight.itineraries?.[0]?.duration?.replace('PT', '')?.replace('H', 'h ')?.replace('M', 'm') || '',
+          date: flight.itineraries?.[0]?.segments?.[0]?.departure?.at ?
+            new Date(flight.itineraries[0].segments[0].departure.at).toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short', 
+              day: 'numeric',
+              year: 'numeric'
+            }) : '',
+          availableSeats: flight.numberOfBookableSeats || 0,
+          price: flight.price?.total ? `$${flight.price.total}` : '$0',
+          // Add connection information
+          stops: (() => {
+            const segments = flight.itineraries?.[0]?.segments || [];
+            return segments.length - 1; // Number of stops = segments - 1
+          })(),
+          connections: (() => {
+            const segments = flight.itineraries?.[0]?.segments || [];
+            if (segments.length <= 1) return [];
+            return segments.slice(0, -1).map((segment: Record<string, unknown>) => (segment.arrival as Record<string, unknown>)?.iataCode).filter(Boolean);
+          })()
+          };
         })
-      })(),
-      availableSeats: 12,
-      price: "$450",
-      cheapestTariffs: 3, // Added for the new feature
-    },
-    {
-      id: 2,
-      airline: "Delta Airlines",
-      flightNumber: "DL 5678",
-      departure: { city: searchParams.origin, code: searchParams.origin, time: "10:30 AM" },
-      arrival: { city: searchParams.destination, code: searchParams.destination, time: "07:00 PM" },
-      duration: "5h 30m",
-      date: (() => {
-        const [year, month, day] = searchParams.date.split("-").map(Number)
-        return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      })(),
-      availableSeats: 8,
-      price: "$425",
-      cheapestTariffs: 0, // Added for the new feature
-    },
-    {
-      id: 3,
-      airline: "United Airlines",
-      flightNumber: "UA 9012",
-      departure: { city: searchParams.origin, code: searchParams.origin, time: "02:15 PM" },
-      arrival: { city: searchParams.destination, code: searchParams.destination, time: "10:45 PM" },
-      duration: "5h 30m",
-      date: (() => {
-        const [year, month, day] = searchParams.date.split("-").map(Number)
-        return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })
-      })(),
-      availableSeats: 15,
-      price: "$475",
-      cheapestTariffs: 5, // Added for the new feature
-    },
-  ]
+        
+        console.log('Transformation result:', {
+          inputLength: Array.isArray(data.data) ? data.data.length : 'not array',
+          outputLength: transformedFlights.length,
+          sampleOutput: transformedFlights[0] ? Object.keys(transformedFlights[0]) : 'no output',
+          flightDetails: transformedFlights.map(f => ({
+            id: f.id,
+            airline: f.airline,
+            flightNumber: f.flightNumber,
+            route: `${f.departure.code} → ${f.arrival.code}`,
+            date: f.date
+          }))
+        });
+        
+        setFlights(transformedFlights)
+        
+        } catch (transformError) {
+          console.error('Transformation error:', transformError);
+          setError('Failed to process flight data');
+          setFlights([]);
+        }
+      } else {
+        throw new Error(data.message || 'Failed to fetch flights')
+      }
+    } catch (err) {
+      console.error('Flight search error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to search for flights')
+      setFlights([]) // Clear flights on error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
 
   const handleSetSearchAlert = () => {
     setIsSearchAlertDialogOpen(true)
@@ -775,10 +891,20 @@ export default function SearchPage() {
               <div className="flex justify-center">
                 <Button
                   type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-800 rounded-full py-6 text-lg cursor-pointer"
+                  disabled={isLoading}
+                  className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full py-6 text-lg cursor-pointer"
                 >
-                  <Search className="w-5 h-5 mr-2" />
-                  Search Flights
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-5 h-5 mr-2" />
+                      Search Flights
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
@@ -896,9 +1022,17 @@ export default function SearchPage() {
               <div className="hidden md:flex items-end">
                 <Button
                   type="submit"
-                  className="w-full bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer h-10"
+                  disabled={isLoading}
+                  className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full cursor-pointer h-10"
                 >
-                  New Search
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    "New Search"
+                  )}
                 </Button>
               </div>
             </div>
@@ -916,10 +1050,20 @@ export default function SearchPage() {
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1 bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer"
+                  disabled={isLoading}
+                  className="flex-1 bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full cursor-pointer"
                 >
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4 mr-2" />
+                      Search
+                    </>
+                  )}
                 </Button>
               </div>
             )}
@@ -981,12 +1125,71 @@ export default function SearchPage() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <p className="text-sm text-gray-600">{flights.length} flights found</p>
-        </div>
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-4" />
+            <p className="text-gray-600">Searching for flights...</p>
+            <p className="text-sm text-gray-500 mt-1">This may take a few seconds</p>
+          </div>
+        )}
 
-        <div className="space-y-4">
-          {flights.map((flight) => (
+        {/* Error State */}
+        {error && !isLoading && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+              <div>
+                <h3 className="font-semibold text-red-800">Search Failed</h3>
+                <p className="text-red-700 mt-1">{error}</p>
+                <Button 
+                  onClick={() => {
+                    const searchApiParams: FlightSearchParams = {
+                      origin: from || "",
+                      destination: to || "",
+                      date: date || "",
+                      airline: airline || undefined,
+                      flightNumber: flightNumber || undefined,
+                    }
+                    fetchFlights(searchApiParams)
+                  }}
+                  variant="outline" 
+                  className="mt-3 rounded-full border-red-300 text-red-700 hover:bg-red-100"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Results Count */}
+        {!isLoading && !error && (
+          <div className="mb-6">
+            <p className="text-sm text-gray-600">
+              {flights.length === 0 ? "No flights found" : `${flights.length} flights found`}
+            </p>
+          </div>
+        )}
+
+        {/* Flight Results */}
+        {!isLoading && !error && (
+          <div className="space-y-4">
+            {flights.length === 0 ? (
+              <div className="text-center py-12">
+                <Plane className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">No flights found</h3>
+                <p className="text-gray-500 mb-4">Try adjusting your search criteria or search date.</p>
+                <Button 
+                  onClick={() => setIsSearchFormExpanded(true)}
+                  variant="outline"
+                  className="rounded-full"
+                >
+                  Modify Search
+                </Button>
+              </div>
+            ) : (
+              flights.map((flight) => (
             <Card key={flight.id} className="p-6 hover:shadow-lg transition-shadow">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                 <div className="flex-1">
@@ -1000,7 +1203,9 @@ export default function SearchPage() {
                     <div>
                       <div className="text-2xl font-bold">{flight.departure.time}</div>
                       <div className="text-sm text-gray-600">{flight.departure.code}</div>
-                      <div className="text-xs text-gray-500">{flight.departure.city}</div>
+                      {flight.departure.city !== flight.departure.code && (
+                        <div className="text-xs text-gray-500">{flight.departure.city}</div>
+                      )}
                     </div>
 
                     <div className="flex-1 flex flex-col items-center">
@@ -1010,13 +1215,19 @@ export default function SearchPage() {
                           <Plane className="w-4 h-4 text-gray-400 rotate-90" />
                         </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">Non-stop</div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {flight.stops === 0 ? 'Non-stop' : 
+                         flight.stops === 1 ? `1 stop in ${flight.connections[0]}` :
+                         `${flight.stops} stops`}
+                      </div>
                     </div>
 
                     <div>
                       <div className="text-2xl font-bold">{flight.arrival.time}</div>
                       <div className="text-sm text-gray-600">{flight.arrival.code}</div>
-                      <div className="text-xs text-gray-500">{flight.arrival.city}</div>
+                      {flight.arrival.city !== flight.arrival.code && (
+                        <div className="text-xs text-gray-500">{flight.arrival.city}</div>
+                      )}
                     </div>
                   </div>
 
@@ -1050,8 +1261,10 @@ export default function SearchPage() {
                 </div>
               </div>
             </Card>
-          ))}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         <Dialog open={isSearchAlertDialogOpen} onOpenChange={setIsSearchAlertDialogOpen}>
           <DialogContent className="sm:max-w-md max-h-[80vh] sm:max-h-[90vh] overflow-y-auto">
