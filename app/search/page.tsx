@@ -808,7 +808,7 @@ export default function SearchPage() {
                   type="text"
                   placeholder="Enter airport name or code (e.g., LAX or Los Angeles)"
                   value={formInputs.origin}
-                  onChange={(e) => setFormInputs({ ...formInputs, origin: e.target.value })}
+                  onChange={(e) => setFormInputs({ ...formInputs, origin: e.target.value.toUpperCase() })}
                   required
                   className="rounded-lg"
                 />
@@ -823,7 +823,7 @@ export default function SearchPage() {
                   type="text"
                   placeholder="Enter airport name or code (e.g., JFK or New York)"
                   value={formInputs.destination}
-                  onChange={(e) => setFormInputs({ ...formInputs, destination: e.target.value })}
+                  onChange={(e) => setFormInputs({ ...formInputs, destination: e.target.value.toUpperCase() })}
                   required
                   className="rounded-lg"
                 />
@@ -962,7 +962,7 @@ export default function SearchPage() {
                 <Input
                   type="text"
                   value={formInputs.origin}
-                  onChange={(e) => setFormInputs({ ...formInputs, origin: e.target.value })}
+                  onChange={(e) => setFormInputs({ ...formInputs, origin: e.target.value.toUpperCase() })}
                   placeholder="e.g., LAX"
                   required
                   className="rounded-lg"
@@ -973,7 +973,7 @@ export default function SearchPage() {
                 <Input
                   type="text"
                   value={formInputs.destination}
-                  onChange={(e) => setFormInputs({ ...formInputs, destination: e.target.value })}
+                  onChange={(e) => setFormInputs({ ...formInputs, destination: e.target.value.toUpperCase() })}
                   placeholder="e.g., JFK"
                   required
                   className="rounded-lg"

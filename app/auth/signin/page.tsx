@@ -2,15 +2,50 @@
 
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import Image from "next/image"
 
 export default function SignInPage() {
   const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+
+    try {
+      // Call server-side API route
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed')
+      }
+
+      // Force a full page reload to refresh auth state
+      window.location.href = '/dashboard'
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Login failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-gray-50">
@@ -31,10 +66,25 @@ export default function SignInPage() {
           <p className="text-sm text-gray-600 mt-2">Sign in to your account</p>
         </div>
 
-        <form className="space-y-4">
+        {error && (
+          <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+            {error}
+          </div>
+        )}
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="you@example.com" className="rounded-full" required />
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="you@example.com" 
+              className="rounded-full" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required 
+              disabled={isLoading}
+            />
           </div>
 
           <div className="space-y-2">
@@ -44,11 +94,31 @@ export default function SignInPage() {
                 Forgot password?
               </Link>
             </div>
-            <Input id="password" type="password" placeholder="••••••••" className="rounded-full" required />
+            <Input 
+              id="password" 
+              type="password" 
+              placeholder="••••••••" 
+              className="rounded-full" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required 
+              disabled={isLoading}
+            />
           </div>
 
-          <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer">
-            Sign In
+          <Button 
+            type="submit" 
+            className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-full cursor-pointer" 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </form>
 

@@ -28,10 +28,24 @@ export interface GuestTokenResponse {
   };
 }
 
+export interface LoginResponse {
+  success: true;
+  token: string;
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  authProvider: 'EMAIL';
+  profilePicture?: string;
+  expiresIn: number;
+  message: string;
+  newUser: boolean;
+}
+
 export interface AuthTokens {
   jwt?: string;
   userId?: string;
-  authProvider?: 'GUEST' | 'USER';
+  authProvider?: 'GUEST' | 'EMAIL';
   expiresAt?: number;
 }
 
@@ -53,7 +67,7 @@ class ApiClient {
     try {
       const jwt = localStorage.getItem('myseatmap_jwt_token');
       const userId = localStorage.getItem('myseatmap_user_id');
-      const authProvider = localStorage.getItem('myseatmap_auth_provider') as 'GUEST' | 'USER';
+      const authProvider = localStorage.getItem('myseatmap_auth_provider') as 'GUEST' | 'EMAIL';
       const expiresAt = localStorage.getItem('myseatmap_token_expires');
 
       return {
@@ -183,6 +197,30 @@ class ApiClient {
   }
 
   /**
+   * Login with email and password
+   * Returns user token for full API access
+   */
+  async login(email: string, password: string): Promise<LoginResponse> {
+    const response = await this.request<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (response.success && response.data) {
+      // Store the user token
+      const expiresAt = Date.now() + (response.data.expiresIn * 1000);
+      this.storeTokens({
+        jwt: response.data.token,
+        userId: response.data.userId,
+        authProvider: response.data.authProvider,
+        expiresAt,
+      });
+    }
+
+    return response.data;
+  }
+
+  /**
    * Check if user has a valid token (guest or registered user)
    */
   isAuthenticated(): boolean {
@@ -211,6 +249,14 @@ class ApiClient {
     if (!this.isAuthenticated()) {
       await this.getGuestToken();
     }
+  }
+
+  /**
+   * Check if user is a registered user (not guest)
+   */
+  isUserAuthenticated(): boolean {
+    const tokens = this.getStoredTokens();
+    return !!(tokens.jwt && !this.isTokenExpired(tokens.expiresAt) && tokens.authProvider === 'EMAIL');
   }
 
   /**
