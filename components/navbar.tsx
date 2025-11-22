@@ -19,7 +19,7 @@ import {
 export function Navbar() {
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const { isAuthenticated, isUser, signOut, isLoading } = useAuth()
+  const { isUser, signOut, isLoading } = useAuth()
 
   const handleLogoClick = () => {
     if (isUser) {

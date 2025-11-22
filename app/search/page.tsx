@@ -92,6 +92,7 @@ export default function SearchPage() {
   const { isUser } = useAuth()
   const [isSavingBookmark, setIsSavingBookmark] = useState(false)
   const [bookmarkError, setBookmarkError] = useState<string | null>(null)
+  const [savingFlightBookmark, setSavingFlightBookmark] = useState<number | null>(null)
   
   // API integration state
   const [flights, setFlights] = useState<Flight[]>([])
@@ -600,6 +601,125 @@ export default function SearchPage() {
     }
   }
 
+  // Function to save flight as bookmark
+  const saveFlightBookmark = async (flightId: number) => {
+    if (!isUser) {
+      setBookmarkError('Please log in to save flights')
+      return false
+    }
+
+    const flight = flights.find((f) => f.id === flightId)
+    if (!flight) {
+      setBookmarkError('Flight not found')
+      return false
+    }
+
+    setSavingFlightBookmark(flightId)
+    setBookmarkError(null)
+
+    try {
+      // Convert flight date and time to ISO format
+      const flightDate = flight.date // e.g., "Wed, Dec 15, 2025"
+      const departureTime = flight.departure.time // e.g., "08:00 AM"
+      const arrivalTime = flight.arrival.time // e.g., "04:35 PM"
+      
+      // Parse the date and times to create ISO strings
+      let departureAt = new Date().toISOString()
+      let arrivalAt = new Date().toISOString()
+      
+      try {
+        const dateStr = flightDate.replace(/^\w+,\s*/, '') // Remove day of week: "Dec 15, 2025"
+        const departureDateTime = new Date(`${dateStr} ${departureTime}`)
+        const arrivalDateTime = new Date(`${dateStr} ${arrivalTime}`)
+        
+        if (!isNaN(departureDateTime.getTime())) {
+          departureAt = departureDateTime.toISOString()
+        }
+        if (!isNaN(arrivalDateTime.getTime())) {
+          arrivalAt = arrivalDateTime.toISOString()
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse flight date/time:', parseError)
+      }
+
+      // Extract carrier code and flight number from flightNumber (e.g., "UA 1679")
+      const flightNumberMatch = flight.flightNumber.match(/^(\w+)\s+(\d+)$/)
+      const carrierCode = flightNumberMatch?.[1] || 'XX'
+      const number = flightNumberMatch?.[2] || '0000'
+
+      // Create flight offer data structure matching API documentation format
+      const flightOfferData = {
+        type: "flight-offer",
+        dataSource: "FRONTEND_SEARCH",
+        source: "SEARCH_RESULTS",
+        instantTicketingRequired: false,
+        nonHomogeneous: false,
+        oneWay: false,
+        numberOfBookableSeats: flight.availableSeats,
+        itineraries: [
+          {
+            duration: flight.duration,
+            segments: [
+              {
+                departure: {
+                  iataCode: flight.departure.code,
+                  at: departureAt
+                },
+                arrival: {
+                  iataCode: flight.arrival.code,
+                  at: arrivalAt
+                },
+                carrierCode: carrierCode,
+                number: number,
+                duration: flight.duration,
+                id: "1",
+                numberOfStops: 0,
+                blacklistedInEU: false
+              }
+            ]
+          }
+        ],
+        price: {
+          currency: "USD",
+          total: flight.price.replace('$', ''),
+          base: flight.price.replace('$', '')
+        }
+      }
+
+      // Create a descriptive title for the flight bookmark
+      const title = `${flight.flightNumber} • ${flight.departure.code} → ${flight.arrival.code} • ${flight.date}`
+
+      const response = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          itemType: 'BOOKMARK',
+          title: title,
+          flightOfferData: JSON.stringify(flightOfferData)
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        console.log('Flight saved successfully:', result.data)
+        return true
+      } else {
+        setBookmarkError(result.message || 'Failed to save flight')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to save flight bookmark:', error)
+      setBookmarkError('Failed to save flight')
+      return false
+    } finally {
+      setSavingFlightBookmark(null)
+    }
+  }
+
   const handleSetSearchAlert = async () => {
     // First, save the search as a bookmark (if user is authenticated)
     if (isUser) {
@@ -628,7 +748,16 @@ export default function SearchPage() {
   }
 
 
-  const handleSetAlert = (flightId: number) => {
+  const handleSetAlert = async (flightId: number) => {
+    // First, save the flight as a bookmark (if user is authenticated)
+    if (isUser) {
+      const saved = await saveFlightBookmark(flightId)
+      if (!saved) {
+        // If flight bookmark saving failed, don't proceed to alert modal
+        return
+      }
+    }
+
     // Find the flight details to populate the alert dialog
     const flight = flights.find((f) => f.id === flightId)
     if (flight) {
@@ -1379,10 +1508,20 @@ export default function SearchPage() {
                     <Button
                       variant="outline"
                       className="rounded-full px-6 bg-transparent text-black cursor-pointer"
+                      disabled={savingFlightBookmark === flight.id}
                       onClick={() => handleSetAlert(flight.id)}
                     >
-                      <Bell className="w-4 h-4 mr-2" />
-                      Set Alert
+                      {savingFlightBookmark === flight.id ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Bell className="w-4 h-4 mr-2" />
+                          Set Alert
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>

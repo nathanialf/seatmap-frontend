@@ -4,10 +4,18 @@ import { useState, useEffect, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Bell, Plane, MapPin, Calendar, Plus, Lock, Eye, Bookmark, Search } from "lucide-react"
+import { Bell, Plane, MapPin, Calendar, Plus, Lock, Eye, Bookmark, Search, Trash2, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
 import { useAuth } from "@/hooks/useAuth"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // Helper function to format travel class for display
 function formatTravelClassForDisplay(travelClass: string): string {
@@ -55,6 +63,9 @@ export default function DashboardPage() {
   const [bookmarksData, setBookmarksData] = useState<BookmarksData | null>(null)
   const [bookmarksLoading, setBookmarksLoading] = useState(false)
   const [bookmarksError, setBookmarksError] = useState<string | null>(null)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [bookmarkToDelete, setBookmarkToDelete] = useState<BookmarkItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
   const { isAuthenticated, isUser, isGuest, isLoading } = useAuth()
 
@@ -153,6 +164,54 @@ export default function DashboardPage() {
       fetchBookmarks()
     }
   }, [isUser, isLoading, fetchBookmarks])
+
+  // Function to handle delete confirmation
+  const handleDeleteClick = (bookmark: BookmarkItem) => {
+    setBookmarkToDelete(bookmark)
+    setDeleteModalOpen(true)
+  }
+
+  // Function to delete bookmark
+  const deleteBookmark = async () => {
+    if (!bookmarkToDelete) return
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/bookmarks/${bookmarkToDelete.bookmarkId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Remove the deleted bookmark from the local state
+        setBookmarksData(prev => prev ? {
+          ...prev,
+          bookmarks: prev.bookmarks.filter(b => b.bookmarkId !== bookmarkToDelete.bookmarkId),
+          total: prev.total - 1
+        } : null)
+        
+        // Close modal and reset state
+        setDeleteModalOpen(false)
+        setBookmarkToDelete(null)
+      } else {
+        console.error('Delete failed:', result.message)
+        // You could add error handling here
+      }
+    } catch (error) {
+      console.error('Failed to delete bookmark:', error)
+      // You could add error handling here
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Function to cancel delete
+  const cancelDelete = () => {
+    setDeleteModalOpen(false)
+    setBookmarkToDelete(null)
+  }
 
   // Function to parse flight offer data for display
   const parseFlightOffer = (flightOfferData: string) => {
@@ -436,8 +495,42 @@ export default function DashboardPage() {
                     </Button>
                   </Card>
                 ) : bookmarksData && bookmarksData.total > 0 ? (
-                  /* Real bookmarks data */
-                  bookmarksData.bookmarks.map((bookmark) => (
+                  /* Real bookmarks data - sorted by departure date (closest first) */
+                  bookmarksData.bookmarks
+                    .slice() // Create a copy to avoid mutating original array
+                    .sort((a, b) => {
+                      // Extract departure date for comparison
+                      const getDate = (bookmark: BookmarkItem) => {
+                        try {
+                          if (bookmark.itemType === 'SAVED_SEARCH' && bookmark.searchRequest) {
+                            const searchRequest = typeof bookmark.searchRequest === 'string' 
+                              ? JSON.parse(bookmark.searchRequest) 
+                              : bookmark.searchRequest
+                            return new Date(searchRequest.departureDate || searchRequest.date)
+                          } else if (bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData) {
+                            const flightOffer = JSON.parse(bookmark.flightOfferData)
+                            // Try different possible date fields in flight offer
+                            if (flightOffer.itineraries?.[0]?.segments?.[0]?.departure?.at) {
+                              return new Date(flightOffer.itineraries[0].segments[0].departure.at)
+                            } else if (flightOffer.date) {
+                              return new Date(flightOffer.date)
+                            }
+                          }
+                          // Fallback to creation date if no departure date found
+                          return new Date(bookmark.createdAt)
+                        } catch {
+                          // If any parsing fails, use creation date
+                          return new Date(bookmark.createdAt)
+                        }
+                      }
+                      
+                      const dateA = getDate(a)
+                      const dateB = getDate(b)
+                      
+                      // Sort by date (closest first)
+                      return dateA.getTime() - dateB.getTime()
+                    })
+                    .map((bookmark) => (
                     <Card key={bookmark.bookmarkId} className="p-6">
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex-1">
@@ -557,7 +650,12 @@ export default function DashboardPage() {
                                 View Seats
                               </Button>
                             )}
-                            <Button variant="outline" className="rounded-full bg-transparent text-sm text-red-600 hover:text-red-700">
+                            <Button 
+                              variant="outline" 
+                              className="rounded-full bg-transparent text-sm text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteClick(bookmark)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
                               Remove
                             </Button>
                           </div>
@@ -654,6 +752,60 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Bookmark
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Are you sure you want to delete this bookmark? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {bookmarkToDelete && (
+            <div className="bg-gray-50 rounded-lg p-3 my-4">
+              <div className="font-medium text-gray-900">{bookmarkToDelete.title}</div>
+              <div className="text-sm text-gray-600">
+                {bookmarkToDelete.itemType === 'BOOKMARK' ? 'Flight Bookmark' : 'Saved Search'}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={cancelDelete}
+              disabled={isDeleting}
+              className="rounded-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={deleteBookmark}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-full"
+            >
+              {isDeleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
