@@ -1201,38 +1201,41 @@ export default function SearchPage() {
           {/* CHANGE: Removed duplicate Set Search Alert button - keeping only the elegant banner below */}
         </div>
 
-        <div className="mb-6 bg-white border-2 border-[#00BBA7] rounded-xl p-4 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#00BBA7]/10 flex items-center justify-center flex-shrink-0">
-                <Bell className="w-5 h-5 text-[#00BBA7]" />
+        {/* Set Search Alert card - only show for registered users */}
+        {isUser && (
+          <div className="mb-6 bg-white border-2 border-[#00BBA7] rounded-xl p-4 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#00BBA7]/10 flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-5 h-5 text-[#00BBA7]" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-1">Monitor All Flights on This Route</h3>
+                  <p className="text-sm text-gray-600">
+                    Get notified when seat availability changes for any flight matching your search criteria
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-1">Monitor All Flights on This Route</h3>
-                <p className="text-sm text-gray-600">
-                  Get notified when seat availability changes for any flight matching your search criteria
-                </p>
-              </div>
+              <Button
+                onClick={handleSetSearchAlert}
+                disabled={isSavingBookmark}
+                className="w-full md:w-auto bg-[#00BBA7] text-white hover:bg-[#009688] disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full px-6 py-3 cursor-pointer transition-all flex-shrink-0 whitespace-nowrap"
+              >
+                {isSavingBookmark ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <span className="font-medium">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    <span className="font-medium">Set Search Alert</span>
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={handleSetSearchAlert}
-              disabled={isSavingBookmark}
-              className="w-full md:w-auto bg-[#00BBA7] text-white hover:bg-[#009688] disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full px-6 py-3 cursor-pointer transition-all flex-shrink-0 whitespace-nowrap"
-            >
-              {isSavingBookmark ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  <span className="font-medium">Saving...</span>
-                </>
-              ) : (
-                <>
-                  <Search className="w-4 h-4 mr-2" />
-                  <span className="font-medium">Set Search Alert</span>
-                </>
-              )}
-            </Button>
           </div>
-        </div>
+        )}
 
         {/* Bookmark Error State */}
         {bookmarkError && (
@@ -1371,14 +1374,17 @@ export default function SearchPage() {
                   >
                     View Seat Map
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-full px-6 bg-transparent text-black cursor-pointer"
-                    onClick={() => handleSetAlert(flight.id)}
-                  >
-                    <Bell className="w-4 h-4 mr-2" />
-                    Set Alert
-                  </Button>
+                  {/* Only show Set Alert button for registered users */}
+                  {isUser && (
+                    <Button
+                      variant="outline"
+                      className="rounded-full px-6 bg-transparent text-black cursor-pointer"
+                      onClick={() => handleSetAlert(flight.id)}
+                    >
+                      <Bell className="w-4 h-4 mr-2" />
+                      Set Alert
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>

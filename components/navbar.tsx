@@ -22,7 +22,7 @@ export function Navbar() {
   const { isAuthenticated, isUser, signOut, isLoading } = useAuth()
 
   const handleLogoClick = () => {
-    if (isAuthenticated) {
+    if (isUser) {
       router.push("/dashboard")
     } else {
       router.push("/")
@@ -45,7 +45,7 @@ export function Navbar() {
             <Link href="/search" className="hover:text-gray-900">
               Search Flights
             </Link>
-            {isAuthenticated && (
+            {isUser && (
               <Link href="/dashboard" className="hover:text-gray-900">
                 Dashboard
               </Link>
@@ -58,7 +58,7 @@ export function Navbar() {
         <div className="hidden md:flex items-center space-x-4">
           {!isLoading && (
             <>
-              {isAuthenticated ? (
+              {isUser ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="cursor-pointer">
@@ -68,19 +68,17 @@ export function Navbar() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>
-                      {isUser ? "My Account" : "Guest User"}
+                      My Account
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => router.push('/dashboard')} className="cursor-pointer">
                       <Settings className="w-4 h-4 mr-2" />
                       Dashboard
                     </DropdownMenuItem>
-                    {isUser && (
-                      <DropdownMenuItem onClick={() => router.push('/profile')} className="cursor-pointer">
-                        <User className="w-4 h-4 mr-2" />
-                        Profile
-                      </DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem onClick={() => router.push('/profile')} className="cursor-pointer">
+                      <User className="w-4 h-4 mr-2" />
+                      Profile
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={signOut} className="cursor-pointer text-red-600">
                       <LogOut className="w-4 h-4 mr-2" />
@@ -120,7 +118,7 @@ export function Navbar() {
             <Link href="/search" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
               Search Flights
             </Link>
-            {isAuthenticated && (
+            {isUser && (
               <Link href="/dashboard" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
                 Dashboard
               </Link>
@@ -131,10 +129,10 @@ export function Navbar() {
             <div className="border-t border-gray-200 pt-4 space-y-3">
               {!isLoading && (
                 <>
-                  {isAuthenticated ? (
+                  {isUser ? (
                     <>
                       <div className="px-2 py-2 text-sm font-medium text-gray-700">
-                        {isUser ? "My Account" : "Guest User"}
+                        My Account
                       </div>
                       <Link href="/dashboard" onClick={handleMobileNavClick}>
                         <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer">
@@ -142,14 +140,12 @@ export function Navbar() {
                           Dashboard
                         </Button>
                       </Link>
-                      {isUser && (
-                        <Link href="/profile" onClick={handleMobileNavClick}>
-                          <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer">
-                            <User className="w-4 h-4 mr-2" />
-                            Profile
-                          </Button>
-                        </Link>
-                      )}
+                      <Link href="/profile" onClick={handleMobileNavClick}>
+                        <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer">
+                          <User className="w-4 h-4 mr-2" />
+                          Profile
+                        </Button>
+                      </Link>
                       <Button 
                         variant="ghost" 
                         className="w-full text-sm text-red-600 justify-start cursor-pointer" 
