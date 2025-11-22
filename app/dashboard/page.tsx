@@ -1,16 +1,182 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Bell, Plane, MapPin, Calendar, TrendingDown, Plus, Lock, Eye } from "lucide-react"
+import { Bell, Plane, MapPin, Calendar, Plus, Lock, Eye, Bookmark, Search } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from 'next/navigation'
 import { useAuth } from "@/hooks/useAuth"
+
+// Helper function to format travel class for display
+function formatTravelClassForDisplay(travelClass: string): string {
+  switch (travelClass) {
+    case 'ECONOMY':
+      return 'Economy'
+    case 'PREMIUM_ECONOMY':
+      return 'Premium Economy'
+    case 'BUSINESS':
+      return 'Business'
+    case 'FIRST':
+      return 'First Class'
+    default:
+      return travelClass
+  }
+}
+
+// Types for bookmark data
+interface BookmarkItem {
+  bookmarkId: string;
+  userId: string;
+  itemType: 'BOOKMARK' | 'SAVED_SEARCH';
+  title: string;
+  flightOfferData?: string;
+  searchRequest?: string | {
+    origin: string;
+    destination: string;
+    departureDate: string;
+    travelClass?: string;
+    flightNumber?: string;
+  };
+  createdAt: string;
+  expiresAt: string;
+}
+
+interface BookmarksData {
+  bookmarks: BookmarkItem[];
+  total: number;
+  tier: string;
+  remaining: number;
+}
 
 export default function DashboardPage() {
   const [showPreview, setShowPreview] = useState(false)
+  const [bookmarksData, setBookmarksData] = useState<BookmarksData | null>(null)
+  const [bookmarksLoading, setBookmarksLoading] = useState(false)
+  const [bookmarksError, setBookmarksError] = useState<string | null>(null)
+  const router = useRouter()
   const { isAuthenticated, isUser, isGuest, isLoading } = useAuth()
+
+  // Function to run a saved search
+  const handleRunSearch = useCallback((bookmark: BookmarkItem) => {
+    if (bookmark.itemType !== 'SAVED_SEARCH' || !bookmark.searchRequest) {
+      return
+    }
+
+    // Parse searchRequest if it's a string (from API)
+    let searchRequest
+    try {
+      searchRequest = typeof bookmark.searchRequest === 'string' 
+        ? JSON.parse(bookmark.searchRequest) 
+        : bookmark.searchRequest
+    } catch (error) {
+      console.error('Failed to parse searchRequest:', error)
+      return
+    }
+
+    // Map saved search fields to search page URL parameters
+    const searchParams = new URLSearchParams()
+    
+    // Required fields - ensure they exist and are not empty
+    const origin = searchRequest.origin?.trim()
+    const destination = searchRequest.destination?.trim() 
+    const departureDate = searchRequest.departureDate?.trim()
+    
+    if (!origin || !destination || !departureDate) {
+      console.error('Missing required search fields:', { origin, destination, departureDate })
+      return
+    }
+    
+    searchParams.set('from', origin)
+    searchParams.set('to', destination)
+    searchParams.set('date', departureDate)
+
+    // Optional fields
+    if (searchRequest.travelClass?.trim()) {
+      searchParams.set('seatClass', searchRequest.travelClass.trim())
+    }
+    
+    // Handle flight number - could be airline code (UA) or full flight number (UA1679)
+    if (searchRequest.flightNumber?.trim()) {
+      const flightNumber = searchRequest.flightNumber.trim()
+      
+      // Check if it's a full flight number (letters followed by numbers)
+      const fullFlightMatch = flightNumber.match(/^([A-Z]{1,3})(\d+)$/)
+      
+      if (fullFlightMatch) {
+        // It's a full flight number like "UA1679" - split into airline and flight
+        const [, airline, flight] = fullFlightMatch
+        searchParams.set('airline', airline)
+        searchParams.set('flight', flight)
+      } else {
+        // It's just an airline code like "UA" - set as airline only
+        searchParams.set('airline', flightNumber.toUpperCase())
+      }
+    }
+
+    // Navigate to search page with parameters using Next.js router
+    router.push(`/search?${searchParams.toString()}`)
+  }, [router])
+
+  // Function to fetch bookmarks from API
+  const fetchBookmarks = useCallback(async () => {
+    if (!isUser) return // Only fetch for authenticated users (not guests)
+    
+    setBookmarksLoading(true)
+    setBookmarksError(null)
+    
+    try {
+      const response = await fetch('/api/bookmarks', {
+        method: 'GET',
+        credentials: 'include', // Include cookies for authentication
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setBookmarksData(result.data)
+      } else {
+        setBookmarksError(result.message || 'Failed to load bookmarks')
+      }
+    } catch (error) {
+      console.error('Failed to fetch bookmarks:', error)
+      setBookmarksError('Failed to load bookmarks')
+    } finally {
+      setBookmarksLoading(false)
+    }
+  }, [isUser])
+
+  // Load bookmarks when user is authenticated
+  useEffect(() => {
+    if (isUser && !isLoading) {
+      fetchBookmarks()
+    }
+  }, [isUser, isLoading, fetchBookmarks])
+
+  // Function to parse flight offer data for display
+  const parseFlightOffer = (flightOfferData: string) => {
+    try {
+      const offer = JSON.parse(flightOfferData)
+      const segment = offer.itineraries?.[0]?.segments?.[0]
+      if (segment) {
+        return {
+          flightNumber: `${segment.carrierCode} ${segment.number}`,
+          route: `${segment.departure.iataCode} → ${segment.arrival.iataCode}`,
+          date: new Date(segment.departure.at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          }),
+          price: offer.price ? `$${offer.price.total}` : null,
+          duration: segment.duration
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse flight offer:', error)
+    }
+    return null
+  }
 
   const activeAlerts = [
     {
@@ -60,9 +226,9 @@ export default function DashboardPage() {
   // Stats - real data for authenticated users, mock data for preview
   const realStats = [
     { label: "Active Alerts", value: "0", icon: Bell },
-    { label: "Flights Tracked", value: "0", icon: Plane },
-    { label: "Seats Monitored", value: "0", icon: MapPin },
-    { label: "Alerts This Month", value: "0", icon: Calendar },
+    { label: "Bookmarks", value: bookmarksData?.total?.toString() || "0", icon: Bookmark },
+    { label: "Flights Saved", value: bookmarksData?.bookmarks?.filter(b => b.itemType === 'BOOKMARK').length.toString() || "0", icon: Plane },
+    { label: "Saved Searches", value: bookmarksData?.bookmarks?.filter(b => b.itemType === 'SAVED_SEARCH').length.toString() || "0", icon: Search },
   ]
 
   const previewStats = [
@@ -204,17 +370,16 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Active Alerts */}
+            {/* Saved Items / Active Alerts */}
             <div className="lg:col-span-2">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">Active Alerts</h2>
-                <Button variant="outline" className="rounded-full bg-transparent text-sm">
-                  View All
-                </Button>
+                <h2 className="text-2xl font-bold">
+                  {isRealDashboard ? "Saved Items" : "Active Alerts"}
+                </h2>
               </div>
 
               <div className="space-y-4">
-                {/* Show preview alerts or real empty state */}
+                {/* Show preview alerts, real bookmarks, or empty state */}
                 {!isRealDashboard ? (
                   activeAlerts.map((alert) => (
                     <Card key={alert.id} className="p-6">
@@ -249,15 +414,166 @@ export default function DashboardPage() {
                       </div>
                     </Card>
                   ))
+                ) : bookmarksLoading ? (
+                  /* Loading state */
+                  <Card className="p-12 text-center">
+                    <div className="text-gray-600">Loading your saved items...</div>
+                  </Card>
+                ) : bookmarksError ? (
+                  /* Error state */
+                  <Card className="p-12 text-center">
+                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                      <Bell className="w-6 h-6 text-red-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-red-600">Error loading bookmarks</h3>
+                    <p className="text-gray-600 mb-4">{bookmarksError}</p>
+                    <Button 
+                      onClick={fetchBookmarks}
+                      variant="outline" 
+                      className="rounded-full bg-transparent"
+                    >
+                      Try Again
+                    </Button>
+                  </Card>
+                ) : bookmarksData && bookmarksData.total > 0 ? (
+                  /* Real bookmarks data */
+                  bookmarksData.bookmarks.map((bookmark) => (
+                    <Card key={bookmark.bookmarkId} className="p-6">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            {bookmark.itemType === 'BOOKMARK' ? (
+                              <Plane className="w-5 h-5 text-blue-600" />
+                            ) : (
+                              <Search className="w-5 h-5 text-green-600" />
+                            )}
+                            <span className="font-semibold">{bookmark.title}</span>
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              bookmark.itemType === 'BOOKMARK' 
+                                ? 'bg-blue-100 text-blue-700' 
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              {bookmark.itemType === 'BOOKMARK' ? 'Flight' : 'Search'}
+                            </span>
+                          </div>
+                          
+                          {bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData ? (
+                            // Display parsed flight offer data
+                            (() => {
+                              const flightInfo = parseFlightOffer(bookmark.flightOfferData)
+                              return flightInfo ? (
+                                <>
+                                  <div className="text-gray-600 mb-2">
+                                    {flightInfo.route} • {flightInfo.date}
+                                    {flightInfo.price && <span className="ml-2 font-medium">{flightInfo.price}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <Plane className="w-4 h-4" />
+                                    <span>Flight {flightInfo.flightNumber}</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-gray-600 mb-2">Flight details</div>
+                              )
+                            })()
+                          ) : bookmark.itemType === 'SAVED_SEARCH' && bookmark.searchRequest ? (
+                            // Display search request data
+                            (() => {
+                              try {
+                                // Parse searchRequest if it's a string
+                                const searchRequest = typeof bookmark.searchRequest === 'string' 
+                                  ? JSON.parse(bookmark.searchRequest) 
+                                  : bookmark.searchRequest
+                                
+                                return (
+                                  <>
+                                    <div className="text-gray-600 mb-2">
+                                      {searchRequest.origin} → {searchRequest.destination} • {searchRequest.departureDate}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                      <Search className="w-4 h-4" />
+                                      <span>
+                                        {searchRequest.travelClass ? formatTravelClassForDisplay(searchRequest.travelClass as string) : 'Any class'}
+                                        {searchRequest.flightNumber && ` • ${searchRequest.flightNumber}`}
+                                      </span>
+                                    </div>
+                                  </>
+                                )
+                              } catch {
+                                return (
+                                  <div className="text-gray-500 text-sm">
+                                    Search details unavailable
+                                  </div>
+                                )
+                              }
+                            })()
+                          ) : null}
+                        </div>
+                        
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="text-sm text-gray-500">
+                            Saved {(() => {
+                              try {
+                                // Handle both ISO strings and epoch timestamps
+                                let date: Date
+                                
+                                if (typeof bookmark.createdAt === 'string') {
+                                  // ISO string format
+                                  date = new Date(bookmark.createdAt)
+                                } else if (typeof bookmark.createdAt === 'number') {
+                                  // Epoch timestamp - check if it's in seconds or milliseconds
+                                  const timestamp = bookmark.createdAt
+                                  // If timestamp is less than year 2000 in milliseconds, it's probably in seconds
+                                  date = timestamp < 946684800000 ? new Date(timestamp * 1000) : new Date(timestamp)
+                                } else {
+                                  console.log('Unexpected createdAt type:', typeof bookmark.createdAt, bookmark.createdAt)
+                                  return 'Recently'
+                                }
+                                
+                                // Check if date is valid
+                                if (isNaN(date.getTime())) {
+                                  console.log('Invalid createdAt date:', bookmark.createdAt)
+                                  return 'Recently'
+                                }
+                                
+                                return date.toLocaleDateString()
+                              } catch (error) {
+                                console.log('Error parsing createdAt:', bookmark.createdAt, error)
+                                return 'Recently'
+                              }
+                            })()}
+                          </div>
+                          <div className="flex gap-2">
+                            {bookmark.itemType === 'SAVED_SEARCH' ? (
+                              <Button 
+                                variant="outline" 
+                                className="rounded-full bg-transparent text-sm"
+                                onClick={() => handleRunSearch(bookmark)}
+                              >
+                                Run Search
+                              </Button>
+                            ) : (
+                              <Button variant="outline" className="rounded-full bg-transparent text-sm">
+                                View Seats
+                              </Button>
+                            )}
+                            <Button variant="outline" className="rounded-full bg-transparent text-sm text-red-600 hover:text-red-700">
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
                 ) : (
                   /* Real authenticated user empty state */
                   <Card className="p-12 text-center">
-                    <Bell className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No active alerts</h3>
-                    <p className="text-gray-600 mb-4">Start tracking flights to get notified about seat availability</p>
+                    <Bookmark className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No saved items yet</h3>
+                    <p className="text-gray-600 mb-4">Save flights and searches to track them here</p>
                     <Link href="/search">
                       <Button className="bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer">
-                        Create Your First Alert
+                        Search Flights
                       </Button>
                     </Link>
                   </Card>
@@ -296,10 +612,6 @@ export default function DashboardPage() {
                         </div>
                       ))}
                     </div>
-
-                    <Button variant="outline" className="w-full mt-4 rounded-full bg-transparent text-sm">
-                      View All Notifications
-                    </Button>
                   </>
                 ) : (
                   <div className="text-center py-8">
@@ -312,7 +624,8 @@ export default function DashboardPage() {
                 )}
               </Card>
 
-              {/* Quick Actions */}
+              {/* Quick Actions - Commented out, may be removed completely */}
+              {/* 
               <Card className="p-6 mt-6">
                 <h3 className="font-semibold mb-4">Quick Actions</h3>
                 <div className="space-y-2">
@@ -336,6 +649,7 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               </Card>
+              */}
             </div>
           </div>
         </div>

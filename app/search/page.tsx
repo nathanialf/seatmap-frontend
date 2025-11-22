@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useCallback } from "react"
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
@@ -47,6 +47,22 @@ type FlightAlertDetails = {
   date: string
   departureTime: string
   arrivalTime: string
+}
+
+// Helper function to format travel class for display
+function formatTravelClassForDisplay(travelClass: string): string {
+  switch (travelClass) {
+    case 'ECONOMY':
+      return 'Economy'
+    case 'PREMIUM_ECONOMY':
+      return 'Premium Economy'
+    case 'BUSINESS':
+      return 'Business'
+    case 'FIRST':
+      return 'First Class'
+    default:
+      return travelClass
+  }
 }
 
 export default function SearchPage() {
@@ -287,6 +303,7 @@ export default function SearchPage() {
       date: formInputs.date,
       airline: formInputs.airline || undefined,
       flightNumber: formInputs.flightNumber || undefined,
+      seatClass: formInputs.seatClass || undefined,
     }
 
     // Fetch flights from API
@@ -309,59 +326,8 @@ export default function SearchPage() {
     })
   }
 
-  // Populate form inputs with URL parameters when available
-  React.useEffect(() => {
-    if (from || to || date || airline || flightNumber || seatClass) {
-      setFormInputs({
-        origin: from || "",
-        destination: to || "",
-        date: date || "",
-        airline: airline || "",
-        flightNumber: flightNumber || "",
-        seatClass: seatClass || "",
-      })
-    }
-  }, [from, to, date, airline, flightNumber, seatClass])
-
-  // Fetch flights on initial page load if search parameters are present
-  React.useEffect(() => {
-    if (hasSearched && from && to && date) {
-      const searchApiParams: FlightSearchParams = {
-        origin: from,
-        destination: to,
-        date,
-        airline: airline || undefined,
-        flightNumber: flightNumber || undefined,
-      }
-      fetchFlights(searchApiParams)
-    }
-  }, [hasSearched, from, to, date, airline, flightNumber]) // Re-run when URL params change
-
-  const getSeatStatus = (row: number, col: number): SeatStatus => {
-    if (deckConfig.exitRowsX.includes(row)) {
-      return "exit"
-    }
-
-    const seatLetter = getSeatLetter(col)
-    const seatNumber = `${row}${seatLetter}`
-    const fixedStatus = fixedSeatMap[seatNumber]
-
-    if (fixedStatus) {
-      if (fixedStatus === "AVAILABLE") return "available"
-      if (fixedStatus === "OCCUPIED") return "occupied"
-      if (fixedStatus === "BLOCKED") return "blocked"
-    }
-
-    return "available"
-  }
-
-  const getSeatLetter = (col: number): string => {
-    const letters = ["A", "B", "C", "D", "E", "F"]
-    return letters[col] || ""
-  }
-
   // Fetch flights from local API route
-  const fetchFlights = async (searchParams: FlightSearchParams): Promise<void> => {
+  const fetchFlights = useCallback(async (searchParams: FlightSearchParams): Promise<void> => {
     try {
       setIsLoading(true)
       setError(null)
@@ -517,8 +483,59 @@ export default function SearchPage() {
     } finally {
       setIsLoading(false)
     }
+  }, []) // Empty dependency array since fetchFlights doesn't depend on any props or state
+
+  // Populate form inputs with URL parameters when available
+  React.useEffect(() => {
+    if (from || to || date || airline || flightNumber || seatClass) {
+      setFormInputs({
+        origin: from || "",
+        destination: to || "",
+        date: date || "",
+        airline: airline || "",
+        flightNumber: flightNumber || "",
+        seatClass: seatClass || "",
+      })
+    }
+  }, [from, to, date, airline, flightNumber, seatClass])
+
+  // Fetch flights on initial page load if search parameters are present
+  React.useEffect(() => {
+    if (hasSearched && from && to && date) {
+      const searchApiParams: FlightSearchParams = {
+        origin: from,
+        destination: to,
+        date,
+        airline: airline || undefined,
+        flightNumber: flightNumber || undefined,
+        seatClass: seatClass || undefined,
+      }
+      fetchFlights(searchApiParams)
+    }
+  }, [hasSearched, from, to, date, airline, flightNumber, seatClass, fetchFlights]) // Re-run when URL params change
+
+  const getSeatStatus = (row: number, col: number): SeatStatus => {
+    if (deckConfig.exitRowsX.includes(row)) {
+      return "exit"
+    }
+
+    const seatLetter = getSeatLetter(col)
+    const seatNumber = `${row}${seatLetter}`
+    const fixedStatus = fixedSeatMap[seatNumber]
+
+    if (fixedStatus) {
+      if (fixedStatus === "AVAILABLE") return "available"
+      if (fixedStatus === "OCCUPIED") return "occupied"
+      if (fixedStatus === "BLOCKED") return "blocked"
+    }
+
+    return "available"
   }
 
+  const getSeatLetter = (col: number): string => {
+    const letters = ["A", "B", "C", "D", "E", "F"]
+    return letters[col] || ""
+  }
 
   const handleSetSearchAlert = () => {
     setIsSearchAlertDialogOpen(true)
@@ -798,7 +815,7 @@ export default function SearchPage() {
           </div>
 
           <div className="bg-gray-50 rounded-2xl p-4 md:p-6 mb-6 md:mb-8">
-            <form onSubmit={handleSearch} className="space-y-6">
+            <form onSubmit={handleSearch} className="space-y-6" suppressHydrationWarning={true}>
               <div>
                 <Label htmlFor="origin" className="text-sm font-medium text-gray-700 mb-2 block">
                   Origin Airport *
@@ -886,9 +903,10 @@ export default function SearchPage() {
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
                     >
                       <option value="">Select class</option>
-                      <option value="economy">Economy</option>
-                      <option value="economy-plus">Economy Plus</option>
-                      <option value="business">Business</option>
+                      <option value="ECONOMY">Economy</option>
+                      <option value="PREMIUM_ECONOMY">Premium Economy</option>
+                      <option value="BUSINESS">Business</option>
+                      <option value="FIRST">First Class</option>
                     </select>
                   </div>
                 </div>
@@ -955,7 +973,7 @@ export default function SearchPage() {
             </button>
           )}
 
-          <form onSubmit={handleSearch} className={`${isSearchFormExpanded ? "block" : "hidden"} md:block space-y-4`}>
+          <form onSubmit={handleSearch} className={`${isSearchFormExpanded ? "block" : "hidden"} md:block space-y-4`} suppressHydrationWarning={true}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-sm text-gray-600 mb-2 block">From</label>
@@ -1018,11 +1036,13 @@ export default function SearchPage() {
                   value={formInputs.seatClass}
                   onChange={(e) => setFormInputs({ ...formInputs, seatClass: e.target.value })}
                   className="w-full rounded-lg border border-gray-300 px-3 text-sm h-10 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                  suppressHydrationWarning={true}
                 >
                   <option value="">Select class</option>
-                  <option value="economy">Economy</option>
-                  <option value="economy-plus">Economy Plus</option>
-                  <option value="business">Business</option>
+                  <option value="ECONOMY">Economy</option>
+                  <option value="PREMIUM_ECONOMY">Premium Economy</option>
+                  <option value="BUSINESS">Business</option>
+                  <option value="FIRST">First Class</option>
                 </select>
               </div>
               <div className="hidden md:flex items-end">
@@ -1100,7 +1120,7 @@ export default function SearchPage() {
               {searchParams.seatClass && (
                 <>
                   <span className="text-gray-400">•</span>
-                  <span className="capitalize">{searchParams.seatClass}</span>
+                  <span>{formatTravelClassForDisplay(searchParams.seatClass)}</span>
                 </>
               )}
             </div>
@@ -1156,6 +1176,7 @@ export default function SearchPage() {
                       date: date || "",
                       airline: airline || undefined,
                       flightNumber: flightNumber || undefined,
+                      seatClass: seatClass || undefined,
                     }
                     fetchFlights(searchApiParams)
                   }}
@@ -1329,7 +1350,7 @@ export default function SearchPage() {
                       <Users className="w-3.5 h-3.5 text-[#00BBA7] flex-shrink-0" />
                       <span className="text-gray-700">
                         Class:{" "}
-                        <span className="font-medium capitalize">{searchParams.seatClass.replace("-", " ")}</span>
+                        <span className="font-medium">{formatTravelClassForDisplay(searchParams.seatClass)}</span>
                       </span>
                     </div>
                   )}

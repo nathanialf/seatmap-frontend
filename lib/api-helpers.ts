@@ -9,6 +9,7 @@ export interface FlightSearchParams {
   date: string
   airline?: string
   flightNumber?: string
+  seatClass?: string
 }
 
 export interface FlightOffersAPIPayload {
@@ -75,6 +76,11 @@ export function prepareFlightSearchPayload(params: FlightSearchParams): FlightOf
     // Only flight number provided: use as-is
     payload.flightNumber = params.flightNumber.trim().toUpperCase()
     payload.maxResults = 3 // Specific flight search, get a few results
+  }
+
+  // Handle optional seatClass field - pass through directly since frontend now uses API values
+  if (params.seatClass) {
+    payload.travelClass = params.seatClass.trim()
   }
 
   return payload
