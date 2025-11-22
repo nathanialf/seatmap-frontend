@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAuth } from '@/hooks/useAuth'
 
 type DeckConfiguration = {
   width: number
@@ -86,6 +87,11 @@ export default function SearchPage() {
   const [showAlertSuccess, setShowAlertSuccess] = useState(false)
   const [isSearchAlertDialogOpen, setIsSearchAlertDialogOpen] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<FlightAlertDetails | null>(null) // State to hold details for the flight alert dialog
+  
+  // Auth and bookmark state
+  const { isUser } = useAuth()
+  const [isSavingBookmark, setIsSavingBookmark] = useState(false)
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null)
   
   // API integration state
   const [flights, setFlights] = useState<Flight[]>([])
@@ -537,7 +543,74 @@ export default function SearchPage() {
     return letters[col] || ""
   }
 
-  const handleSetSearchAlert = () => {
+  // Function to save search as bookmark
+  const saveSearchBookmark = async () => {
+    if (!isUser) {
+      setBookmarkError('Please log in to save searches')
+      return false
+    }
+
+    setIsSavingBookmark(true)
+    setBookmarkError(null)
+
+    try {
+      // Build search request object from current form inputs
+      const searchRequest = {
+        origin: formInputs.origin,
+        destination: formInputs.destination,
+        departureDate: formInputs.date,
+        travelClass: formInputs.seatClass || null,
+        flightNumber: formInputs.airline && formInputs.flightNumber 
+          ? `${formInputs.airline}${formInputs.flightNumber}` 
+          : formInputs.airline || formInputs.flightNumber || null,
+        maxResults: 10
+      }
+
+      // Create a descriptive title for the saved search
+      const title = `${formInputs.origin} → ${formInputs.destination} • ${formInputs.date}`
+
+      const response = await fetch('/api/bookmarks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          itemType: 'SAVED_SEARCH',
+          title: title,
+          searchRequest: searchRequest
+        }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        console.log('Search saved successfully:', result.data)
+        return true
+      } else {
+        setBookmarkError(result.message || 'Failed to save search')
+        return false
+      }
+    } catch (error) {
+      console.error('Failed to save search bookmark:', error)
+      setBookmarkError('Failed to save search')
+      return false
+    } finally {
+      setIsSavingBookmark(false)
+    }
+  }
+
+  const handleSetSearchAlert = async () => {
+    // First, save the search as a bookmark (if user is authenticated)
+    if (isUser) {
+      const saved = await saveSearchBookmark()
+      if (!saved) {
+        // If bookmark saving failed, don't proceed to alert modal
+        return
+      }
+    }
+    
+    // Then open the alert modal as before
     setIsSearchAlertDialogOpen(true)
   }
 
@@ -1143,13 +1216,34 @@ export default function SearchPage() {
             </div>
             <Button
               onClick={handleSetSearchAlert}
-              className="w-full md:w-auto bg-[#00BBA7] text-white hover:bg-[#009688] rounded-full px-6 py-3 cursor-pointer transition-all flex-shrink-0 whitespace-nowrap"
+              disabled={isSavingBookmark}
+              className="w-full md:w-auto bg-[#00BBA7] text-white hover:bg-[#009688] disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full px-6 py-3 cursor-pointer transition-all flex-shrink-0 whitespace-nowrap"
             >
-              <Search className="w-4 h-4 mr-2" />
-              <span className="font-medium">Set Search Alert</span>
+              {isSavingBookmark ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <span className="font-medium">Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Search className="w-4 h-4 mr-2" />
+                  <span className="font-medium">Set Search Alert</span>
+                </>
+              )}
             </Button>
           </div>
         </div>
+
+        {/* Bookmark Error State */}
+        {bookmarkError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <p className="text-red-700 font-medium">Failed to save search</p>
+            </div>
+            <p className="text-red-600 text-sm mt-1">{bookmarkError}</p>
+          </div>
+        )}
 
         {/* Loading State */}
         {isLoading && (
