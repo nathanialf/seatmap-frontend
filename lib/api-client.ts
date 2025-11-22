@@ -49,6 +49,23 @@ export interface AuthTokens {
   expiresAt?: number;
 }
 
+export interface TierInfo {
+  tierId: string;
+  tierName: 'FREE' | 'PRO' | 'BUSINESS' | 'DEV';
+  displayName: string;
+  description: string;
+  maxBookmarks: number | null;
+  maxSeatmapCalls: number | null;
+  priceUsd: number;
+  billingType: 'free' | 'monthly' | 'one_time';
+  canDowngrade: boolean;
+  publiclyAccessible: boolean;
+  region: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 class ApiClient {
   private baseUrl: string;
   private apiKey: string;

@@ -88,12 +88,7 @@ export default function SignInPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link href="/auth/forgot-password" className="text-xs text-gray-600 hover:text-gray-900">
-                Forgot password?
-              </Link>
-            </div>
+            <Label htmlFor="password">Password</Label>
             <Input 
               id="password" 
               type="password" 
@@ -104,6 +99,11 @@ export default function SignInPage() {
               required 
               disabled={isLoading}
             />
+            <div className="text-right">
+              <Link href="/auth/forgot-password" className="text-xs text-gray-600 hover:text-gray-900">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           <Button 

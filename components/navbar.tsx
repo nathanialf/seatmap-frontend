@@ -45,14 +45,14 @@ export function Navbar() {
             <Link href="/search" className="hover:text-gray-900">
               Search Flights
             </Link>
-            <Link href="/pricing" className="hover:text-gray-900">
-              Pricing
-            </Link>
             {isAuthenticated && (
               <Link href="/dashboard" className="hover:text-gray-900">
                 Dashboard
               </Link>
             )}
+            <Link href="/pricing" className="hover:text-gray-900">
+              Pricing
+            </Link>
           </nav>
         </div>
         <div className="hidden md:flex items-center space-x-4">
@@ -120,14 +120,14 @@ export function Navbar() {
             <Link href="/search" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
               Search Flights
             </Link>
-            <Link href="/pricing" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
-              Pricing
-            </Link>
             {isAuthenticated && (
               <Link href="/dashboard" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
                 Dashboard
               </Link>
             )}
+            <Link href="/pricing" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
+              Pricing
+            </Link>
             <div className="border-t border-gray-200 pt-4 space-y-3">
               {!isLoading && (
                 <>

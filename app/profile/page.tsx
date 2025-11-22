@@ -1,23 +1,63 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { useRouter } from 'next/navigation'
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { User, Mail, Shield, Calendar, AlertCircle, Loader2, LogOut, Settings, Trash2 } from 'lucide-react'
+import { Badge } from "@/components/ui/badge"
+import { User, Mail, Shield, AlertCircle, Loader2, LogOut, Settings, Trash2, Crown, Star, Zap } from 'lucide-react'
 
 interface ProfileData {
   email: string
   firstName: string
   lastName: string
   profilePicture?: string
+  accountTier?: 'FREE' | 'PRO' | 'BUSINESS' | 'DEV'
+  emailVerified?: boolean
+  status?: string
 }
 
 interface ApiResponse<T> {
   success: boolean
   message?: string
   data: T
+}
+
+// Tier utility functions
+const getTierDisplayInfo = (tierName?: string) => {
+  switch (tierName) {
+    case 'FREE':
+      return {
+        displayName: 'Free Plan',
+        icon: User,
+        color: 'bg-gray-100 text-gray-800 border-gray-300'
+      }
+    case 'PRO':
+      return {
+        displayName: 'Pro Plan',
+        icon: Star,
+        color: 'bg-blue-100 text-blue-800 border-blue-300'
+      }
+    case 'BUSINESS':
+      return {
+        displayName: 'Business Plan',
+        icon: Crown,
+        color: 'bg-purple-100 text-purple-800 border-purple-300'
+      }
+    case 'DEV':
+      return {
+        displayName: 'Developer Plan',
+        icon: Zap,
+        color: 'bg-green-100 text-green-800 border-green-300'
+      }
+    default:
+      return {
+        displayName: 'Unknown Plan',
+        icon: User,
+        color: 'bg-gray-100 text-gray-800 border-gray-300'
+      }
+  }
 }
 
 export default function ProfilePage() {
@@ -27,6 +67,59 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
   const [isUser, setIsUser] = useState<boolean>(false)
+
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const response = await fetch('/api/profile')
+      const data: ApiResponse<ProfileData> = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      console.log('Profile API response:', data)
+      console.log('Response keys:', Object.keys(data))
+      console.log('data.success:', data.success)
+      console.log('data.data:', data.data)
+      console.log('data.message:', data.message)
+      
+      if (data.success) {
+        let profileData = null
+        
+        if (data.data) {
+          // Standard nested structure: { success: true, data: {...} }
+          profileData = data.data
+        } else if (data.userId || data.email || data.firstName) {
+          // Profile data might be directly in the response
+          profileData = { ...data }
+          delete profileData.success
+          delete profileData.message
+        } else {
+          // Backend returned success but no profile fields - log everything for debugging
+          console.warn('Profile API returned success but no profile data.')
+          console.warn('Full response:', JSON.stringify(data, null, 2))
+          console.warn('Available keys:', Object.keys(data))
+          
+          // Backend endpoint exists and responds but returns no profile data
+          // This indicates a backend issue - the endpoint should return profile data
+          throw new Error('Backend returned success but no profile data. This indicates a backend configuration issue.')
+        }
+        
+        setProfile(profileData)
+      } else {
+        throw new Error(data.message || 'Failed to fetch profile')
+      }
+    } catch (err) {
+      console.error('Profile fetch error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load profile')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
   // Check authentication status
   useEffect(() => {
@@ -62,56 +155,8 @@ export default function ProfilePage() {
     }
 
     checkAuthStatus()
-  }, [router])
+  }, [router, fetchProfile])
 
-  const fetchProfile = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const response = await fetch('/api/profile')
-      const data: ApiResponse<ProfileData> = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      console.log('Profile API response:', data)
-      console.log('Response keys:', Object.keys(data))
-      console.log('data.success:', data.success)
-      console.log('data.data:', data.data)
-      console.log('data.message:', data.message)
-      
-      if (data.success) {
-        if (data.data) {
-          // Standard nested structure: { success: true, data: {...} }
-          setProfile(data.data)
-        } else if (data.userId || data.email || data.firstName) {
-          // Profile data might be directly in the response
-          const profileData = { ...data }
-          delete profileData.success
-          delete profileData.message
-          setProfile(profileData)
-        } else {
-          // Backend returned success but no profile fields - log everything for debugging
-          console.warn('Profile API returned success but no profile data.')
-          console.warn('Full response:', JSON.stringify(data, null, 2))
-          console.warn('Available keys:', Object.keys(data))
-          
-          // Backend endpoint exists and responds but returns no profile data
-          // This indicates a backend issue - the endpoint should return profile data
-          throw new Error('Backend returned success but no profile data. This indicates a backend configuration issue.')
-        }
-      } else {
-        throw new Error(data.message || 'Failed to fetch profile')
-      }
-    } catch (err) {
-      console.error('Profile fetch error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load profile')
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleLogout = async () => {
     try {
@@ -263,6 +308,7 @@ export default function ProfilePage() {
                     <p className="text-gray-900">{profile.email}</p>
                   </div>
                 </div>
+
               </div>
             </Card>
 
@@ -279,26 +325,37 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Current Plan
+                  </label>
+                  <div className="p-3 bg-gray-50 rounded-lg border">
+                    {(() => {
+                      const tierInfo = getTierDisplayInfo(profile.accountTier)
+                      const TierIcon = tierInfo.icon
+                      
+                      return (
+                        <div className="flex items-center gap-3">
+                          <TierIcon className="w-5 h-5 text-gray-600" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-gray-900 font-medium">{tierInfo.displayName}</span>
+                              <Badge className={`${tierInfo.color} border rounded-full text-xs px-2 py-1`}>
+                                {profile.accountTier || 'Unknown'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                </div>
+                
                 <p className="text-sm text-gray-500">
                   Additional account management features will be available in future updates.
                   For now, you can logout or return to the main application.
                 </p>
                 
-                <div className="flex gap-3">
-                  <Button
-                    onClick={() => router.push('/')}
-                    className="bg-teal-600 hover:bg-teal-700 text-white rounded-full"
-                  >
-                    Back to Home
-                  </Button>
-                  <Button
-                    onClick={() => router.push('/search')}
-                    variant="outline"
-                    className="rounded-full"
-                  >
-                    Search Flights
-                  </Button>
-                </div>
 
                 <div className="pt-4 border-t border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Danger Zone</h3>

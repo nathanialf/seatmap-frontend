@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import config from '@/lib/config'
 
 /**
  * GET /api/auth/status
@@ -28,6 +29,51 @@ export async function GET() {
     const isUser = isAuthenticated && authProvider === 'EMAIL';
     const isGuest = isAuthenticated && authProvider === 'GUEST';
 
+    let userTier = null;
+
+    // If user is authenticated (not guest), fetch their tier from profile
+    if (isUser && tokenCookie) {
+      try {
+        console.log('Fetching profile for tier extraction...');
+        const profileResponse = await fetch(`${config.apiBaseUrl}/auth/profile`, {
+          method: 'GET',
+          headers: {
+            'X-API-Key': config.apiKey,
+            'Authorization': `Bearer ${tokenCookie.value}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        console.log('Profile response status:', profileResponse.status);
+        
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          console.log('Profile data in auth status:', {
+            success: profileData.success,
+            hasData: !!profileData.data,
+            accountTier: profileData.data?.accountTier,
+            fullData: profileData
+          });
+          
+          // Handle both wrapped and unwrapped response structures
+          if (profileData.success && profileData.data) {
+            // Frontend API structure: { success: true, data: { accountTier: "PRO" } }
+            userTier = profileData.data.accountTier || null;
+          } else if (profileData.accountTier) {
+            // Backend API direct structure: { accountTier: "PRO", userId: "...", ... }
+            userTier = profileData.accountTier;
+          }
+          
+          console.log('Extracted userTier:', userTier);
+        } else {
+          console.error('Profile response not OK in auth status:', profileResponse.status, profileResponse.statusText);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user tier:', error);
+        // Don't fail the auth status check if tier fetch fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -37,6 +83,7 @@ export async function GET() {
         authProvider: authProvider || null,
         userId: userId || null,
         expiresAt: isAuthenticated ? expiresAt : null,
+        userTier,
       },
     });
 
@@ -54,6 +101,7 @@ export async function GET() {
           authProvider: null,
           userId: null,
           expiresAt: null,
+          userTier: null,
         },
       },
       { status: 500 }
