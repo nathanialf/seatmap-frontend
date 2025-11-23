@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Bell, Plane, MapPin, Calendar, Plus, Lock, Eye, Bookmark, Search, Trash2, AlertTriangle } from "lucide-react"
+import { Bell, Plane, MapPin, Calendar, Plus, Lock, Eye, Bookmark, Search, Trash2, AlertTriangle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
 import { useAuth } from "@/hooks/useAuth"
@@ -40,13 +40,14 @@ interface BookmarkItem {
   itemType: 'BOOKMARK' | 'SAVED_SEARCH';
   title: string;
   flightOfferData?: string;
-  searchRequest?: string | {
-    origin: string;
-    destination: string;
-    departureDate: string;
-    travelClass?: string;
-    flightNumber?: string;
-  };
+  // Individual saved search fields (new API structure)
+  origin?: string;
+  destination?: string;
+  departureDate?: string;
+  travelClass?: string;
+  airlineCode?: string;
+  flightNumber?: string;
+  maxResults?: number;
   createdAt: string;
   expiresAt: string;
 }
@@ -71,18 +72,7 @@ export default function DashboardPage() {
 
   // Function to run a saved search
   const handleRunSearch = useCallback((bookmark: BookmarkItem) => {
-    if (bookmark.itemType !== 'SAVED_SEARCH' || !bookmark.searchRequest) {
-      return
-    }
-
-    // Parse searchRequest if it's a string (from API)
-    let searchRequest
-    try {
-      searchRequest = typeof bookmark.searchRequest === 'string' 
-        ? JSON.parse(bookmark.searchRequest) 
-        : bookmark.searchRequest
-    } catch (error) {
-      console.error('Failed to parse searchRequest:', error)
+    if (bookmark.itemType !== 'SAVED_SEARCH') {
       return
     }
 
@@ -90,9 +80,9 @@ export default function DashboardPage() {
     const searchParams = new URLSearchParams()
     
     // Required fields - ensure they exist and are not empty
-    const origin = searchRequest.origin?.trim()
-    const destination = searchRequest.destination?.trim() 
-    const departureDate = searchRequest.departureDate?.trim()
+    const origin = bookmark.origin?.trim()
+    const destination = bookmark.destination?.trim() 
+    const departureDate = bookmark.departureDate?.trim()
     
     if (!origin || !destination || !departureDate) {
       console.error('Missing required search fields:', { origin, destination, departureDate })
@@ -104,26 +94,16 @@ export default function DashboardPage() {
     searchParams.set('date', departureDate)
 
     // Optional fields
-    if (searchRequest.travelClass?.trim()) {
-      searchParams.set('seatClass', searchRequest.travelClass.trim())
+    if (bookmark.travelClass?.trim()) {
+      searchParams.set('seatClass', bookmark.travelClass.trim())
     }
     
-    // Handle flight number - could be airline code (UA) or full flight number (UA1679)
-    if (searchRequest.flightNumber?.trim()) {
-      const flightNumber = searchRequest.flightNumber.trim()
-      
-      // Check if it's a full flight number (letters followed by numbers)
-      const fullFlightMatch = flightNumber.match(/^([A-Z]{1,3})(\d+)$/)
-      
-      if (fullFlightMatch) {
-        // It's a full flight number like "UA1679" - split into airline and flight
-        const [, airline, flight] = fullFlightMatch
-        searchParams.set('airline', airline)
-        searchParams.set('flight', flight)
-      } else {
-        // It's just an airline code like "UA" - set as airline only
-        searchParams.set('airline', flightNumber.toUpperCase())
-      }
+    if (bookmark.airlineCode?.trim()) {
+      searchParams.set('airline', bookmark.airlineCode.trim())
+    }
+    
+    if (bookmark.flightNumber?.trim()) {
+      searchParams.set('flight', bookmark.flightNumber.trim())
     }
 
     // Navigate to search page with parameters using Next.js router
@@ -476,6 +456,7 @@ export default function DashboardPage() {
                 ) : bookmarksLoading ? (
                   /* Loading state */
                   <Card className="p-12 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
                     <div className="text-gray-600">Loading your saved items...</div>
                   </Card>
                 ) : bookmarksError ? (
@@ -502,11 +483,8 @@ export default function DashboardPage() {
                       // Extract departure date for comparison
                       const getDate = (bookmark: BookmarkItem) => {
                         try {
-                          if (bookmark.itemType === 'SAVED_SEARCH' && bookmark.searchRequest) {
-                            const searchRequest = typeof bookmark.searchRequest === 'string' 
-                              ? JSON.parse(bookmark.searchRequest) 
-                              : bookmark.searchRequest
-                            return new Date(searchRequest.departureDate || searchRequest.date)
+                          if (bookmark.itemType === 'SAVED_SEARCH' && bookmark.departureDate) {
+                            return new Date(bookmark.departureDate)
                           } else if (bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData) {
                             const flightOffer = JSON.parse(bookmark.flightOfferData)
                             // Try different possible date fields in flight offer
@@ -569,37 +547,21 @@ export default function DashboardPage() {
                                 <div className="text-gray-600 mb-2">Flight details</div>
                               )
                             })()
-                          ) : bookmark.itemType === 'SAVED_SEARCH' && bookmark.searchRequest ? (
-                            // Display search request data
-                            (() => {
-                              try {
-                                // Parse searchRequest if it's a string
-                                const searchRequest = typeof bookmark.searchRequest === 'string' 
-                                  ? JSON.parse(bookmark.searchRequest) 
-                                  : bookmark.searchRequest
-                                
-                                return (
-                                  <>
-                                    <div className="text-gray-600 mb-2">
-                                      {searchRequest.origin} → {searchRequest.destination} • {searchRequest.departureDate}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                                      <Search className="w-4 h-4" />
-                                      <span>
-                                        {searchRequest.travelClass ? formatTravelClassForDisplay(searchRequest.travelClass as string) : 'Any class'}
-                                        {searchRequest.flightNumber && ` • ${searchRequest.flightNumber}`}
-                                      </span>
-                                    </div>
-                                  </>
-                                )
-                              } catch {
-                                return (
-                                  <div className="text-gray-500 text-sm">
-                                    Search details unavailable
-                                  </div>
-                                )
-                              }
-                            })()
+                          ) : bookmark.itemType === 'SAVED_SEARCH' && bookmark.origin && bookmark.destination ? (
+                            // Display saved search data using individual fields
+                            <>
+                              <div className="text-gray-600 mb-2">
+                                {bookmark.origin} → {bookmark.destination} • {bookmark.departureDate}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <Search className="w-4 h-4" />
+                                <span>
+                                  {bookmark.travelClass ? formatTravelClassForDisplay(bookmark.travelClass) : 'Any class'}
+                                  {bookmark.airlineCode && ` • ${bookmark.airlineCode}`}
+                                  {bookmark.flightNumber && ` ${bookmark.flightNumber}`}
+                                </span>
+                              </div>
+                            </>
                           ) : null}
                         </div>
                         

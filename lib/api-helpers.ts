@@ -17,6 +17,7 @@ export interface FlightOffersAPIPayload {
   destination: string
   departureDate: string
   travelClass?: string
+  airlineCode?: string
   flightNumber?: string
   maxResults?: number
   includeRawFlightOffer?: boolean
@@ -43,7 +44,8 @@ export interface FlightOffersAPIPayload {
  * //   origin: "LAX",
  * //   destination: "JFK",
  * //   departureDate: "2025-12-15",
- * //   flightNumber: "AA1234"
+ * //   airlineCode: "AA",
+ * //   flightNumber: "1234"
  * // }
  */
 export function prepareFlightSearchPayload(params: FlightSearchParams): FlightOffersAPIPayload {
@@ -63,19 +65,18 @@ export function prepareFlightSearchPayload(params: FlightSearchParams): FlightOf
     includeRawFlightOffer: false, // Don't need raw data for frontend
   }
 
-  // Handle optional flightNumber field
-  // Backend expects flightNumber to be either airline code (e.g., "UA") or full flight number (e.g., "UA1679")
-  if (params.airline && params.flightNumber) {
-    // Both airline and flight number provided: combine them (e.g., "UA" + "1679" = "UA1679")
-    payload.flightNumber = `${params.airline.trim().toUpperCase()}${params.flightNumber.trim()}`
+  // Handle optional airline and flight number fields
+  // Backend now expects separate airlineCode and flightNumber fields
+  if (params.airline) {
+    payload.airlineCode = params.airline.trim().toUpperCase()
+  }
+  
+  if (params.flightNumber) {
+    payload.flightNumber = params.flightNumber.trim()
     payload.maxResults = 3 // Specific flight search, get a few results
   } else if (params.airline) {
-    // Only airline provided: use airline code as filter (e.g., "UA")
-    payload.flightNumber = params.airline.trim().toUpperCase()
-  } else if (params.flightNumber) {
-    // Only flight number provided: use as-is
-    payload.flightNumber = params.flightNumber.trim().toUpperCase()
-    payload.maxResults = 3 // Specific flight search, get a few results
+    // Only airline provided: search all flights for that airline
+    payload.maxResults = 10 // More results for airline-only search
   }
 
   // Handle optional seatClass field - pass through directly since frontend now uses API values

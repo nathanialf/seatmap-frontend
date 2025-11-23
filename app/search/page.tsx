@@ -351,7 +351,16 @@ export default function SearchPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`)
+        console.warn('Flight search validation issue:', {
+          status: response.status,
+          statusText: response.statusText,
+          message: data.message,
+          searchParams
+        })
+        
+        // Set user-friendly error message for display
+        setError(data.message || `Failed to search flights (${response.status})`)
+        return
       }
 
       if (data.success && data.data) {
@@ -556,15 +565,32 @@ export default function SearchPage() {
 
     try {
       // Build search request object from current form inputs
-      const searchRequest = {
+      const searchRequest: Record<string, unknown> = {
         origin: formInputs.origin,
         destination: formInputs.destination,
         departureDate: formInputs.date,
-        travelClass: formInputs.seatClass || null,
-        flightNumber: formInputs.airline && formInputs.flightNumber 
-          ? `${formInputs.airline}${formInputs.flightNumber}` 
-          : formInputs.airline || formInputs.flightNumber || null,
         maxResults: 10
+      }
+
+      // Only include optional fields if they have values
+      if (formInputs.seatClass?.trim()) {
+        searchRequest.travelClass = formInputs.seatClass.trim()
+      }
+      
+      if (formInputs.airline?.trim()) {
+        const airline = formInputs.airline.trim()
+        // Only include if it's 2-3 uppercase letters to match backend validation
+        if (/^[A-Z]{2,3}$/.test(airline)) {
+          searchRequest.airlineCode = airline
+        }
+      }
+      
+      if (formInputs.flightNumber?.trim()) {
+        const flightNum = formInputs.flightNumber.trim()
+        // Only include if it's 1-4 digits to match backend validation
+        if (/^[0-9]{1,4}$/.test(flightNum)) {
+          searchRequest.flightNumber = flightNum
+        }
       }
 
       // Create a descriptive title for the saved search
@@ -624,8 +650,9 @@ export default function SearchPage() {
       const arrivalTime = flight.arrival.time // e.g., "04:35 PM"
       
       // Parse the date and times to create ISO strings
-      let departureAt = new Date().toISOString()
-      let arrivalAt = new Date().toISOString()
+      // Use a fixed timestamp to prevent hydration mismatch
+      let departureAt = "2025-01-01T00:00:00.000Z"
+      let arrivalAt = "2025-01-01T00:00:00.000Z"
       
       try {
         const dateStr = flightDate.replace(/^\w+,\s*/, '') // Remove day of week: "Dec 15, 2025"

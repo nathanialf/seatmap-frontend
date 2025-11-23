@@ -1,7 +1,8 @@
 import Link from "next/link"
 
 export function Footer() {
-  const currentYear = new Date().getFullYear()
+  // Use a fixed year to prevent hydration mismatch
+  const currentYear = 2025
 
   return (
     <footer className="border-t border-gray-200 mt-16">
