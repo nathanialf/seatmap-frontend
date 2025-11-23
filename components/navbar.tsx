@@ -45,11 +45,9 @@ export function Navbar() {
             <Link href="/search" className="hover:text-gray-900">
               Search Flights
             </Link>
-            {isUser && (
-              <Link href="/dashboard" className="hover:text-gray-900">
-                Dashboard
-              </Link>
-            )}
+            <Link href="/dashboard" className="hover:text-gray-900">
+              Dashboard
+            </Link>
             <Link href="/pricing" className="hover:text-gray-900">
               Pricing
             </Link>
@@ -118,11 +116,9 @@ export function Navbar() {
             <Link href="/search" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
               Search Flights
             </Link>
-            {isUser && (
-              <Link href="/dashboard" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
-                Dashboard
-              </Link>
-            )}
+            <Link href="/dashboard" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
+              Dashboard
+            </Link>
             <Link href="/pricing" className="text-gray-700 hover:text-gray-900 py-2" onClick={handleMobileNavClick}>
               Pricing
             </Link>

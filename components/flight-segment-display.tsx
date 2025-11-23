@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Users, Plane, Calendar, Clock, MapPin } from 'lucide-react'
+import { Users, Plane } from 'lucide-react'
 import { Card } from "@/components/ui/card"
 import { calculateSeatAvailability, type SeatmapData } from "./seatmap-renderer"
 
@@ -33,7 +33,7 @@ interface FlightSegmentDisplayProps {
 const FlightSegmentDisplay: React.FC<FlightSegmentDisplayProps> = ({
   segments,
   seatmapData,
-  seatmapAvailable,
+  seatmapAvailable: _seatmapAvailable,
   className = ""
 }) => {
   if (!segments || segments.length <= 1) {
@@ -47,7 +47,6 @@ const FlightSegmentDisplay: React.FC<FlightSegmentDisplayProps> = ({
   
   const hasPartialSeatmap = segmentsWithSeatmap > 0 && segmentsWithSeatmap < segments.length
   const hasFullSeatmap = segmentsWithSeatmap === segments.length
-  const hasNoSeatmap = segmentsWithSeatmap === 0
 
   return (
     <Card className={`p-4 ${className}`}>
@@ -82,14 +81,13 @@ const FlightSegmentDisplay: React.FC<FlightSegmentDisplayProps> = ({
         <div className="space-y-2">
           <div className="text-xs font-medium text-gray-700 mb-2">Flight Segments:</div>
           {segments.map((segment) => {
-            const { segmentAvailability, isOverallData, hasSegmentData } = (() => {
+            const { segmentAvailability, hasSegmentData } = (() => {
               // For multi-segment flights, only show data for segments that actually have seatmap data
               const segmentSeats = seatmapData?.decks?.[segment.segmentIndex]?.seats || []
               const hasSegmentSeatmap = segmentSeats.length > 0
               
               return {
                 segmentAvailability: hasSegmentSeatmap ? calculateSeatAvailability(segmentSeats) : null,
-                isOverallData: false, // No longer falling back to overall data
                 hasSegmentData: hasSegmentSeatmap
               }
             })()

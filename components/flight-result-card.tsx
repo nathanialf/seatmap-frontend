@@ -75,7 +75,7 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
               if (flight.seatmapData?.seats) {
                 // Show per-segment availability for multi-segment flights
                 if (flight.segments && flight.segments.length > 1) {
-                  return flight.segments.map((segment: FlightSegment, index: number) => {
+                  return flight.segments.map((segment: FlightSegment, _index: number) => {
                     // Only show availability for segments that actually have seatmap data
                     const segmentSeats = flight.seatmapData?.decks?.[segment.segmentIndex]?.seats || []
                     const hasSegmentSeatmap = segmentSeats.length > 0

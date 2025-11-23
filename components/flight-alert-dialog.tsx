@@ -1,9 +1,11 @@
 "use client"
 
-import React from "react"
-import { Calendar, Clock, MapPin, Plane } from 'lucide-react'
+import React, { useState } from "react"
+import { Calendar, Clock, MapPin, Plane, AlertTriangle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import {
   Dialog,
   DialogContent,
@@ -24,7 +26,12 @@ export interface FlightAlertDetails {
   arrivalTime: string
 }
 
-interface AlertSetupDialogProps {
+interface FlightAlertSettings {
+  selectedCabin: string
+  seatCountThreshold: number
+}
+
+interface FlightAlertDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   flightDetails: FlightAlertDetails | null
@@ -32,11 +39,11 @@ interface AlertSetupDialogProps {
   onCabinChange: (cabin: string) => void
   seatCountThreshold: number
   onSeatCountThresholdChange: (threshold: number) => void
-  onConfirm: () => void
+  onConfirm: (bookmarkName: string, setAlert: boolean, alertSettings?: FlightAlertSettings) => void
   className?: string
 }
 
-const AlertSetupDialog: React.FC<AlertSetupDialogProps> = ({
+const FlightAlertDialog: React.FC<FlightAlertDialogProps> = ({
   isOpen,
   onOpenChange,
   flightDetails,
@@ -47,17 +54,63 @@ const AlertSetupDialog: React.FC<AlertSetupDialogProps> = ({
   onConfirm,
   className = ""
 }) => {
+  const [bookmarkName, setBookmarkName] = useState("")
+  const [setAlert, setSetAlert] = useState(false)
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className={`sm:max-w-md max-h-[80vh] sm:max-h-[90vh] overflow-y-auto ${className}`}>
         <DialogHeader>
           <DialogTitle>Set Flight Alert</DialogTitle>
           <DialogDescription>
-            Get notified when seat availability changes for this specific flight.
+            Save this flight and optionally set up alerts for seat availability changes.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 pb-4 pt-0">
+          {/* Bookmark Name Field */}
+          <div className="space-y-3">
+            <Label htmlFor="flight-bookmark-name" className="text-sm font-medium">
+              Bookmark Name
+            </Label>
+            <Input
+              id="flight-bookmark-name"
+              value={bookmarkName}
+              onChange={(e) => setBookmarkName(e.target.value)}
+              placeholder={flightDetails ? `${flightDetails.flightNumber} • ${flightDetails.from} → ${flightDetails.to} • ${flightDetails.date}` : "Flight details"}
+              className="rounded-lg"
+            />
+          </div>
+
+          {/* Alert Toggle */}
+          <div className="flex items-center justify-between space-x-2 p-3 bg-gray-50 rounded-lg">
+            <div className="flex-1">
+              <Label htmlFor="flight-alert-toggle" className="text-sm font-medium">
+                Set up alert
+              </Label>
+              <p className="text-xs text-gray-500 mt-1">
+                Get notified when seat availability changes for this flight
+              </p>
+            </div>
+            <Switch
+              id="flight-alert-toggle"
+              checked={setAlert}
+              onCheckedChange={setSetAlert}
+            />
+          </div>
+
+          {/* Alert Configuration (conditionally visible) */}
+          {setAlert && (
+            <div className="space-y-4 border border-gray-200 rounded-lg p-4">
+              {/* Under Construction Banner */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-medium text-amber-800 text-sm">Under Construction</h4>
+                    <p className="text-xs text-amber-700">Flight alerts are currently being developed!</p>
+                  </div>
+                </div>
+              </div>
           {flightDetails && (
             <div className="bg-gradient-to-br from-[#00BBA7]/10 to-[#00BBA7]/5 border border-[#00BBA7]/30 rounded-lg p-3 space-y-1.5">
               <p className="font-semibold text-gray-600 uppercase tracking-wide mb-1.5 text-xs">Alert Details</p>
@@ -146,15 +199,17 @@ const AlertSetupDialog: React.FC<AlertSetupDialogProps> = ({
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-gray-500" />
-              <span className="font-medium text-gray-700">Alert expires on departure:</span>
-              <span className="text-gray-600">
-                {flightDetails?.date}
-              </span>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="w-4 h-4 text-gray-500" />
+                  <span className="font-medium text-gray-700">Alert expires on departure:</span>
+                  <span className="text-gray-600">
+                    {flightDetails?.date}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
@@ -168,10 +223,17 @@ const AlertSetupDialog: React.FC<AlertSetupDialogProps> = ({
           </Button>
           <Button
             type="button"
-            onClick={onConfirm}
+            onClick={() => onConfirm(
+              bookmarkName || (flightDetails ? `${flightDetails.flightNumber} • ${flightDetails.from} → ${flightDetails.to} • ${flightDetails.date}` : "Flight details"),
+              setAlert,
+              setAlert ? {
+                selectedCabin,
+                seatCountThreshold
+              } : undefined
+            )}
             className="bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer"
           >
-            Confirm Alert
+            Save {setAlert ? 'and Set Alert' : 'Bookmark'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -179,4 +241,4 @@ const AlertSetupDialog: React.FC<AlertSetupDialogProps> = ({
   )
 }
 
-export { AlertSetupDialog }
+export { FlightAlertDialog }

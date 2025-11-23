@@ -5,36 +5,23 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Plane, MapPin, Bell, Search, ArrowLeft, Calendar, Clock, Users, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react'
+import { Plane, MapPin, Bell, Search, ArrowLeft, Calendar, Clock, Users, AlertCircle, Loader2 } from 'lucide-react'
 import { 
   type FlightSearchParams,
-  type Flight,
-  type FlightSegment 
+  type Flight
 } from "@/lib/api-helpers"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from '@/hooks/useAuth'
-import { SeatmapRenderer, calculateSeatAvailability, getSeatStatusFromData } from "@/components/seatmap-renderer"
+import { SeatmapRenderer, calculateSeatAvailability } from "@/components/seatmap-renderer"
 import { FlightSearchForm } from "@/components/flight-search-form"
 import { FlightSegmentDisplay } from "@/components/flight-segment-display"
 import { FlightResultCard } from "@/components/flight-result-card"
 import { CompactSearchForm } from "@/components/compact-search-form"
-import { AlertSetupDialog, type FlightAlertDetails } from "@/components/alert-setup-dialog"
+import { FlightAlertDialog, type FlightAlertDetails } from "@/components/flight-alert-dialog"
+import { SearchAlertDialog } from "@/components/search-alert-dialog"
 import { 
   formatTravelClassForDisplay, 
-  formatFlightDate, 
   transformFlightData,
-  createFlightOfferData,
-  createSearchRequest
+  createFlightOfferData
 } from "@/lib/flight-utils"
 
 
@@ -55,7 +42,6 @@ export default function SearchPage() {
   const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false)
   const [selectedFlightForAlert, setSelectedFlightForAlert] = useState<number | null>(null)
   const [selectedCabin, setSelectedCabin] = useState("all")
-  const [isSearchFormExpanded, setIsSearchFormExpanded] = useState(false)
   const [showAlertSuccess, setShowAlertSuccess] = useState(false)
   const [isSearchAlertDialogOpen, setIsSearchAlertDialogOpen] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<FlightAlertDetails | null>(null) // State to hold details for the flight alert dialog
@@ -84,55 +70,9 @@ export default function SearchPage() {
     seatClass: seatClass || "",
   }
 
-  const [formInputs, setFormInputs] = useState({
-    origin: "",
-    destination: "",
-    date: "",
-    airline: "",
-    flightNumber: "",
-    seatClass: "",
-  })
 
 
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    const params = new URLSearchParams()
-    params.set("from", formInputs.origin)
-    params.set("to", formInputs.destination)
-    params.set("date", formInputs.date)
-
-    if (formInputs.airline) {
-      params.set("airline", formInputs.airline)
-    }
-
-    if (formInputs.flightNumber) {
-      params.set("flight", formInputs.flightNumber)
-    }
-
-    if (formInputs.seatClass) {
-      params.set("seatClass", formInputs.seatClass)
-    }
-
-    // Update search params and navigate
-    router.push(`/search?${params.toString()}`)
-
-    // Prepare API search parameters
-    const searchApiParams: FlightSearchParams = {
-      origin: formInputs.origin,
-      destination: formInputs.destination,
-      date: formInputs.date,
-      airline: formInputs.airline || undefined,
-      flightNumber: formInputs.flightNumber || undefined,
-      seatClass: formInputs.seatClass || undefined,
-    }
-
-    // Fetch flights from API
-    await fetchFlights(searchApiParams)
-
-    setIsSearchFormExpanded(false)
-  }
 
   // Handler for the new FlightSearchForm component
   const handleFormSubmit = (searchParams: FlightSearchParams) => {
@@ -151,14 +91,6 @@ export default function SearchPage() {
     router.push("/search")
     setFlights([]) // Clear flights
     setError(null) // Clear any errors
-    setFormInputs({
-      origin: "",
-      destination: "",
-      date: "",
-      airline: "",
-      flightNumber: "",
-      seatClass: "",
-    })
   }
 
   // Fetch flights from local API route
@@ -292,238 +224,104 @@ export default function SearchPage() {
 
 
 
-  // Function to save search as bookmark
-  const saveSearchBookmark = async () => {
-    if (!isUser) {
-      setBookmarkError('Please log in to save searches')
-      return false
-    }
 
-    setIsSavingBookmark(true)
-    setBookmarkError(null)
+  const handleSetSearchAlert = () => {
+    // Just open the dialog - bookmark creation will happen in the dialog
+    setIsSearchAlertDialogOpen(true)
+  }
 
+  const handleConfirmSearchAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { selectedCabin: string; availabilityThreshold: number }) => {
     try {
-      // Build search request object from current form inputs
-      const searchRequest: Record<string, unknown> = {
-        origin: formInputs.origin,
-        destination: formInputs.destination,
-        departureDate: formInputs.date,
-        maxResults: 10
-      }
-
-      // Only include optional fields if they have values
-      if (formInputs.seatClass?.trim()) {
-        searchRequest.travelClass = formInputs.seatClass.trim()
-      }
+      console.log('handleConfirmSearchAlert called with:', { bookmarkName, setAlert, alertSettings, isUser })
       
-      if (formInputs.airline?.trim()) {
-        const airline = formInputs.airline.trim()
-        // Only include if it's 2-3 uppercase letters to match backend validation
-        if (/^[A-Z]{2,3}$/.test(airline)) {
-          searchRequest.airlineCode = airline
+      // Create bookmark with custom name
+      if (isUser) {
+        setIsSavingBookmark(true)
+        
+        // Build search request object from current search params
+        const searchRequest: Record<string, unknown> = {
+          origin: searchParams.origin,
+          destination: searchParams.destination,
+          departureDate: searchParams.date,
+          maxResults: 10
         }
-      }
-      
-      if (formInputs.flightNumber?.trim()) {
-        const flightNum = formInputs.flightNumber.trim()
-        // Only include if it's 1-4 digits to match backend validation
-        if (/^[0-9]{1,4}$/.test(flightNum)) {
-          searchRequest.flightNumber = flightNum
+
+        // Only include optional fields if they have values
+        if (searchParams.seatClass?.trim()) {
+          searchRequest.travelClass = searchParams.seatClass.trim()
         }
-      }
-
-      // Create a descriptive title for the saved search
-      const title = `${formInputs.origin} → ${formInputs.destination} • ${formInputs.date}`
-
-      const response = await fetch('/api/bookmarks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+        
+        if (searchParams.airline?.trim()) {
+          const airline = searchParams.airline.trim()
+          // Only include if it's 2-3 uppercase letters to match backend validation
+          if (/^[A-Z]{2,3}$/.test(airline)) {
+            searchRequest.airlineCode = airline
+          }
+        }
+        
+        if (searchParams.flightNumber?.trim()) {
+          const flightNum = searchParams.flightNumber.trim()
+          // Only include if it's 1-4 digits to match backend validation
+          if (/^[0-9]{1,4}$/.test(flightNum)) {
+            searchRequest.flightNumber = flightNum
+          }
+        }
+        
+        console.log('Creating bookmark with data:', {
           itemType: 'SAVED_SEARCH',
-          title: title,
+          title: bookmarkName,
           searchRequest: searchRequest
-        }),
-      })
+        })
+        
+        const response = await fetch('/api/bookmarks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            itemType: 'SAVED_SEARCH',
+            title: bookmarkName,
+            searchRequest: searchRequest
+          }),
+        })
 
-      const result = await response.json()
-
-      if (result.success) {
-        console.log('Search saved successfully:', result.data)
-        return true
+        console.log('Bookmark API response:', response.status, response.statusText)
+        
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('Bookmark API error:', errorText)
+          throw new Error(`Failed to save bookmark: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        console.log('Bookmark created successfully:', result)
       } else {
-        setBookmarkError(result.message || 'Failed to save search')
-        return false
+        console.log('User not authenticated, skipping bookmark creation')
       }
+
+      // If alert was requested, log the alert settings (since alerts are under construction)
+      if (setAlert && alertSettings) {
+        console.log("[v0] Search alert set for:", searchParams, "Alert settings:", alertSettings)
+      }
+
+      setIsSearchAlertDialogOpen(false)
+      setSelectedCabin("all")
+      setAvailabilityThreshold(30)
+      setShowAlertSuccess(true)
+      setTimeout(() => {
+        setShowAlertSuccess(false)
+      }, 3000)
     } catch (error) {
       console.error('Failed to save search bookmark:', error)
       setBookmarkError('Failed to save search')
-      return false
     } finally {
       setIsSavingBookmark(false)
     }
   }
 
-  // Function to save flight as bookmark
-  const saveFlightBookmark = async (flightId: number) => {
-    if (!isUser) {
-      setBookmarkError('Please log in to save flights')
-      return false
-    }
 
-    const flight = flights.find((f) => f.id === flightId)
-    if (!flight) {
-      setBookmarkError('Flight not found')
-      return false
-    }
-
-    setSavingFlightBookmark(flightId)
-    setBookmarkError(null)
-
-    try {
-      // Convert flight date and time to ISO format
-      const flightDate = flight.date // e.g., "Wed, Dec 15, 2025"
-      const departureTime = flight.departure.time // e.g., "08:00 AM"
-      const arrivalTime = flight.arrival.time // e.g., "04:35 PM"
-      
-      // Parse the date and times to create ISO strings
-      // Use a fixed timestamp to prevent hydration mismatch
-      let departureAt = "2025-01-01T00:00:00.000Z"
-      let arrivalAt = "2025-01-01T00:00:00.000Z"
-      
-      try {
-        const dateStr = flightDate.replace(/^\w+,\s*/, '') // Remove day of week: "Dec 15, 2025"
-        const departureDateTime = new Date(`${dateStr} ${departureTime}`)
-        const arrivalDateTime = new Date(`${dateStr} ${arrivalTime}`)
-        
-        if (!isNaN(departureDateTime.getTime())) {
-          departureAt = departureDateTime.toISOString()
-        }
-        if (!isNaN(arrivalDateTime.getTime())) {
-          arrivalAt = arrivalDateTime.toISOString()
-        }
-      } catch (parseError) {
-        console.warn('Failed to parse flight date/time:', parseError)
-      }
-
-      // Extract carrier code and flight number from flightNumber (e.g., "UA 1679")
-      const flightNumberMatch = flight.flightNumber.match(/^(\w+)\s+(\d+)$/)
-      const carrierCode = flightNumberMatch?.[1] || 'XX'
-      const number = flightNumberMatch?.[2] || '0000'
-
-      // Create flight offer data structure matching API documentation format
-      const flightOfferData = {
-        type: "flight-offer",
-        dataSource: "FRONTEND_SEARCH",
-        source: "SEARCH_RESULTS",
-        instantTicketingRequired: false,
-        nonHomogeneous: false,
-        oneWay: false,
-        numberOfBookableSeats: flight.availableSeats,
-        itineraries: [
-          {
-            duration: flight.duration,
-            segments: [
-              {
-                departure: {
-                  iataCode: flight.departure.code,
-                  at: departureAt
-                },
-                arrival: {
-                  iataCode: flight.arrival.code,
-                  at: arrivalAt
-                },
-                carrierCode: carrierCode,
-                number: number,
-                duration: flight.duration,
-                id: "1",
-                numberOfStops: 0,
-                blacklistedInEU: false
-              }
-            ]
-          }
-        ],
-        price: {
-          currency: "USD",
-          total: flight.price.replace('$', ''),
-          base: flight.price.replace('$', '')
-        }
-      }
-
-      // Create a descriptive title for the flight bookmark
-      const title = `${flight.flightNumber} • ${flight.departure.code} → ${flight.arrival.code} • ${flight.date}`
-
-      const response = await fetch('/api/bookmarks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          itemType: 'BOOKMARK',
-          title: title,
-          flightOfferData: JSON.stringify(flightOfferData)
-        }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        console.log('Flight saved successfully:', result.data)
-        return true
-      } else {
-        setBookmarkError(result.message || 'Failed to save flight')
-        return false
-      }
-    } catch (error) {
-      console.error('Failed to save flight bookmark:', error)
-      setBookmarkError('Failed to save flight')
-      return false
-    } finally {
-      setSavingFlightBookmark(null)
-    }
-  }
-
-  const handleSetSearchAlert = async () => {
-    // First, save the search as a bookmark (if user is authenticated)
-    if (isUser) {
-      const saved = await saveSearchBookmark()
-      if (!saved) {
-        // If bookmark saving failed, don't proceed to alert modal
-        return
-      }
-    }
-    
-    // Then open the alert modal as before
-    setIsSearchAlertDialogOpen(true)
-  }
-
-  const handleConfirmSearchAlert = () => {
-    console.log("[v0] Search alert set for:", searchParams, "Cabin:", selectedCabin, "Threshold:", {
-      availability: availabilityThreshold,
-    })
-    setIsSearchAlertDialogOpen(false)
-    setSelectedCabin("all")
-    setAvailabilityThreshold(30)
-    setShowAlertSuccess(true)
-    setTimeout(() => {
-      setShowAlertSuccess(false)
-    }, 3000)
-  }
-
-
-  const handleSetAlert = async (flightId: number) => {
-    // First, save the flight as a bookmark (if user is authenticated)
-    if (isUser) {
-      const saved = await saveFlightBookmark(flightId)
-      if (!saved) {
-        // If flight bookmark saving failed, don't proceed to alert modal
-        return
-      }
-    }
-
+  const handleSetAlert = (flightId: number) => {
     // Find the flight details to populate the alert dialog
     const flight = flights.find((f) => f.id === flightId)
     if (flight) {
@@ -576,19 +374,72 @@ export default function SearchPage() {
     setIsAlertDialogOpen(true)
   }
 
-  const handleConfirmAlert = () => {
-    // Here you would typically save the alert to a database or state management
-    console.log("[v0] Alert set for flight:", selectedFlightForAlert, "Cabin:", selectedCabin, "Threshold:", {
-      availability: availabilityThreshold,
-    })
-    setIsAlertDialogOpen(false)
-    setSelectedCabin("all")
-    setAvailabilityThreshold(30)
-    setShowAlertSuccess(true)
-    setTimeout(() => {
-      setShowAlertSuccess(false)
-    }, 3000)
+  const handleConfirmAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { selectedCabin: string; seatCountThreshold: number }) => {
+    try {
+      // Create bookmark with custom name
+      if (isUser && selectedFlightForAlert !== null) {
+        setSavingFlightBookmark(selectedFlightForAlert)
+        const flight = flights.find((f) => f.id === selectedFlightForAlert)
+        if (flight) {
+          const flightOfferData = createFlightOfferData(flight)
+          console.log('Creating flight bookmark with data:', {
+            itemType: 'BOOKMARK',
+            title: bookmarkName,
+            flightOfferData: flightOfferData
+          })
+          
+          const response = await fetch('/api/bookmarks', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              itemType: 'BOOKMARK',
+              title: bookmarkName,
+              flightOfferData: JSON.stringify(flightOfferData)
+            }),
+          })
+
+          console.log('Flight bookmark API response:', response.status, response.statusText)
+          
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('Flight bookmark API error:', errorText)
+            throw new Error(`Failed to save bookmark: ${response.status}`)
+          }
+          
+          const result = await response.json()
+          console.log('Flight bookmark created successfully:', result)
+        }
+      }
+
+      // If alert was requested, log the alert settings (since alerts are under construction)
+      if (setAlert && alertSettings) {
+        console.log("[v0] Alert set for flight:", selectedFlightForAlert, "Alert settings:", alertSettings)
+      }
+
+      setIsAlertDialogOpen(false)
+      setSelectedCabin("all")
+      setSeatCountThreshold(50)
+      setShowAlertSuccess(true)
+      setTimeout(() => {
+        setShowAlertSuccess(false)
+      }, 3000)
+    } catch (error) {
+      console.error('Failed to save flight bookmark:', error)
+      setBookmarkError('Failed to save flight')
+    } finally {
+      setSavingFlightBookmark(null)
+    }
   }
+
+  // Scroll to top when seat map viewer becomes visible
+  React.useEffect(() => {
+    if (selectedFlightForSeatMap !== null) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [selectedFlightForSeatMap])
 
   if (selectedFlightForSeatMap !== null) {
     const flight = flights.find((f) => f.id === selectedFlightForSeatMap)
@@ -939,164 +790,19 @@ export default function SearchPage() {
           </div>
         )}
 
-        <Dialog open={isSearchAlertDialogOpen} onOpenChange={setIsSearchAlertDialogOpen}>
-          <DialogContent className="sm:max-w-md max-h-[80vh] sm:max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Set Search Alert</DialogTitle>
-              <DialogDescription>
-                Get notified when any flight matching your search criteria has seat availability changes. You&apos;ll receive
-                alerts for all flights on this route.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 pb-4 pt-0">
-              <div className="bg-gradient-to-br from-[#00BBA7]/10 to-[#00BBA7]/5 border border-[#00BBA7]/30 rounded-lg p-3 space-y-1.5">
-                <p className="font-semibold text-gray-600 uppercase tracking-wide mb-1.5 text-xs">Alert Details</p>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 text-base">
-                    <MapPin className="w-3.5 h-3.5 text-[#00BBA7] flex-shrink-0" />
-                    <span className="font-semibold text-gray-800">
-                      {searchParams.origin} → {searchParams.destination}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-base">
-                    <Calendar className="w-3.5 h-3.5 text-[#00BBA7] flex-shrink-0" />
-                    <span className="text-gray-700">
-                      {(() => {
-                        const [year, month, day] = searchParams.date.split("-").map(Number)
-                        return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      })()}
-                    </span>
-                  </div>
-                  {searchParams.airline && (
-                    <div className="flex items-center gap-1.5 text-base">
-                      <Plane className="w-3.5 h-3.5 text-[#00BBA7] flex-shrink-0" />
-                      <span className="text-gray-700">
-                        Airline: <span className="font-medium">{searchParams.airline}</span>
-                      </span>
-                    </div>
-                  )}
-                  {searchParams.flightNumber && (
-                    <div className="flex items-center gap-1.5 text-base">
-                      <span className="w-3.5 h-3.5 text-[#00BBA7] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                        #
-                      </span>
-                      <span className="text-gray-700">
-                        Flight: <span className="font-medium">{searchParams.flightNumber}</span>
-                      </span>
-                    </div>
-                  )}
-                  {searchParams.seatClass && (
-                    <div className="flex items-center gap-1.5 text-base">
-                      <Users className="w-3.5 h-3.5 text-[#00BBA7] flex-shrink-0" />
-                      <span className="text-gray-700">
-                        Class:{" "}
-                        <span className="font-medium">{formatTravelClassForDisplay(searchParams.seatClass)}</span>
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label htmlFor="search-cabin-select" className="text-sm font-medium">
-                  Select Cabin
-                </Label>
-                <Select value={selectedCabin} onValueChange={setSelectedCabin}>
-                  <SelectTrigger id="search-cabin-select" className="rounded-lg">
-                    <SelectValue placeholder="Select cabin class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Cabins</SelectItem>
-                    <SelectItem value="first">First Class</SelectItem>
-                    <SelectItem value="business">Business Class</SelectItem>
-                    <SelectItem value="premium">Premium Economy</SelectItem>
-                    <SelectItem value="economy">Economy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3 pt-2 border-t border-gray-200">
-                <Label className="text-sm font-medium text-gray-700">Availability Threshold (Optional)</Label>
-                <p className="text-xs text-gray-500 -mt-1">Get alerted when availability meets these conditions</p>
-
-                <div className="space-y-3">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Alert when availability is above:</span>
-                      <span className="text-lg font-semibold text-[#00BBA7]">{availabilityThreshold}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={availabilityThreshold}
-                      onChange={(e) => setAvailabilityThreshold(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#00BBA7] [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[#00BBA7] [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, #00BBA7 0%, #00BBA7 ${availabilityThreshold}%, #e5e7eb ${availabilityThreshold}%, #e5e7eb 100%)`,
-                      }}
-                    />
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>0%</span>
-                      <span>50%</span>
-                      <span>100%</span>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Get alerted when seat availability is above {availabilityThreshold}%, indicating high chances of
-                      getting on the flight
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-gray-500" />
-                  <span className="font-medium text-gray-700">Alert expires on departure:</span>
-                  <span className="text-gray-600">
-                    {(() => {
-                      const [year, month, day] = searchParams.date.split("-").map(Number)
-                      return new Date(year, month - 1, day).toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    })()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="flex-col sm:flex-row gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsSearchAlertDialogOpen(false)}
-                className="rounded-full cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmSearchAlert}
-                className="bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer"
-              >
-                Confirm Alert
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <SearchAlertDialog
+          isOpen={isSearchAlertDialogOpen}
+          onOpenChange={setIsSearchAlertDialogOpen}
+          searchParams={searchParams}
+          selectedCabin={selectedCabin}
+          onCabinChange={setSelectedCabin}
+          availabilityThreshold={availabilityThreshold}
+          onAvailabilityThresholdChange={setAvailabilityThreshold}
+          onConfirm={handleConfirmSearchAlert}
+        />
 
         {/* Individual Flight Alert Dialog */}
-        <AlertSetupDialog
+        <FlightAlertDialog
           isOpen={isAlertDialogOpen}
           onOpenChange={setIsAlertDialogOpen}
           flightDetails={selectedFlight}

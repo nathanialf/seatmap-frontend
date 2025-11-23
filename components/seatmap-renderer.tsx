@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useState } from "react"
-import { Users } from 'lucide-react'
 import { Card } from "@/components/ui/card"
 
 type SeatStatus = "available" | "occupied" | "blocked" | "exit"

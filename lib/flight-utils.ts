@@ -1,5 +1,4 @@
-import type { FlightSearchParams, Flight, FlightSegment } from "@/lib/api-helpers"
-import type { SeatmapData } from "@/components/seatmap-renderer"
+import type { FlightSearchParams, Flight } from "@/lib/api-helpers"
 
 // Helper function to format travel class for display
 export function formatTravelClassForDisplay(travelClass: string): string {
@@ -35,7 +34,7 @@ export function formatFlightDate(dateString: string): string {
 // Transform backend flight response to frontend Flight format
 export function transformFlightData(
   backendFlights: Record<string, unknown>[], 
-  dictionaries: Record<string, any> = {}
+  dictionaries: Record<string, Record<string, string>> = {}
 ): Flight[] {
   return backendFlights.map((flight: Record<string, unknown>, index: number) => {
     const segments = flight.itineraries?.[0]?.segments || [];
@@ -110,7 +109,7 @@ export function transformFlightData(
       seatmapAvailable: flight.seatMapAvailable || false,
       seatmapData: flight.seatMap || null,
       // Capture segment information (seatmap is at flight level, not segment level)
-      segments: segments.map((segment: any, segIndex: number) => ({
+      segments: segments.map((segment: Record<string, unknown>, segIndex: number) => ({
         segmentIndex: segIndex,
         carrier: segment.carrierCode || '',
         flightNumber: `${segment.carrierCode || ''} ${segment.number || ''}`.trim(),
@@ -141,7 +140,7 @@ export function transformFlightData(
 }
 
 // Create flight offer data structure for bookmarking
-export function createFlightOfferData(flight: Flight): Record<string, any> {
+export function createFlightOfferData(flight: Flight): Record<string, unknown> {
   // Extract carrier code and flight number from flightNumber (e.g., "UA 1679")
   const flightNumberMatch = flight.flightNumber.match(/^(\w+)\s+(\d+)$/)
   const carrierCode = flightNumberMatch?.[1] || 'XX'

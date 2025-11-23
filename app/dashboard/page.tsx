@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Bell, Plane, MapPin, Calendar, Plus, Lock, Eye, Bookmark, Search, Trash2, AlertTriangle, Loader2 } from "lucide-react"
+import { Bell, Plane, MapPin, Calendar, Bookmark, Search, Trash2, AlertTriangle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
 import { useAuth } from "@/hooks/useAuth"
+import { SavedItemCard, type BookmarkItem } from "@/components/saved-item-card"
 import {
   Dialog,
   DialogContent,
@@ -17,40 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-// Helper function to format travel class for display
-function formatTravelClassForDisplay(travelClass: string): string {
-  switch (travelClass) {
-    case 'ECONOMY':
-      return 'Economy'
-    case 'PREMIUM_ECONOMY':
-      return 'Premium Economy'
-    case 'BUSINESS':
-      return 'Business'
-    case 'FIRST':
-      return 'First Class'
-    default:
-      return travelClass
-  }
-}
-
 // Types for bookmark data
-interface BookmarkItem {
-  bookmarkId: string;
-  userId: string;
-  itemType: 'BOOKMARK' | 'SAVED_SEARCH';
-  title: string;
-  flightOfferData?: string;
-  // Individual saved search fields (new API structure)
-  origin?: string;
-  destination?: string;
-  departureDate?: string;
-  travelClass?: string;
-  airlineCode?: string;
-  flightNumber?: string;
-  maxResults?: number;
-  createdAt: string;
-  expiresAt: string;
-}
 
 interface BookmarksData {
   bookmarks: BookmarkItem[];
@@ -264,7 +232,7 @@ export default function DashboardPage() {
 
   // Stats - real data for authenticated users, mock data for preview
   const realStats = [
-    { label: "Active Alerts", value: "0", icon: Bell },
+    { label: "Active Alerts", value: "COMING SOON", icon: Bell },
     { label: "Bookmarks", value: bookmarksData?.total?.toString() || "0", icon: Bookmark },
     { label: "Flights Saved", value: bookmarksData?.bookmarks?.filter(b => b.itemType === 'BOOKMARK').length.toString() || "0", icon: Plane },
     { label: "Saved Searches", value: bookmarksData?.bookmarks?.filter(b => b.itemType === 'SAVED_SEARCH').length.toString() || "0", icon: Search },
@@ -277,8 +245,6 @@ export default function DashboardPage() {
     { label: "Alerts This Month", value: "24", icon: Calendar },
   ]
 
-  // Show different content based on authentication state
-  const shouldShowDashboard = isAuthenticated || showPreview
   const isRealDashboard = isAuthenticated && !showPreview
 
   const stats = isRealDashboard ? realStats : previewStats
@@ -300,48 +266,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      {!shouldShowDashboard ? (
-        <div className="max-w-7xl mx-auto px-6 py-16">
-          <Card className="max-w-2xl mx-auto p-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Lock className="w-8 h-8 text-gray-600" />
-            </div>
-            <h2 className="text-3xl font-bold mb-4">Sign in to view your dashboard</h2>
-            <p className="text-gray-600 mb-8 text-lg">
-              Create an account or sign in to track flights, set up alerts, and monitor seat availability in real-time.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/signup">
-                <Button className="bg-black text-white hover:bg-gray-800 rounded-full px-8 py-3 w-full sm:w-auto cursor-pointer">
-                  Create Account
-                </Button>
-              </Link>
-              <Link href="/auth/signin">
-                <Button variant="outline" className="rounded-full px-8 py-3 bg-transparent w-full sm:w-auto">
-                  Sign In
-                </Button>
-              </Link>
-            </div>
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <Button
-                variant="outline"
-                className="rounded-full px-6 py-2 bg-transparent text-sm cursor-pointer"
-                onClick={() => setShowPreview(true)}
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                Preview Dashboard
-              </Button>
-            </div>
-            <p className="text-sm text-gray-500 mt-6">
-              Already have an account?{" "}
-              <Link href="/auth/signin" className="text-black font-medium hover:underline">
-                Sign in here
-              </Link>
-            </p>
-          </Card>
-        </div>
-      ) : (
-        <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
             <div>
@@ -364,14 +289,7 @@ export default function DashboardPage() {
                 }
               </p>
             </div>
-            {isRealDashboard ? (
-              <Link href="/search">
-                <Button className="bg-black text-white hover:bg-gray-800 rounded-full px-6 mt-4 md:mt-0 cursor-pointer">
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Alert
-                </Button>
-              </Link>
-            ) : (
+            {!isRealDashboard && (
               <div className="flex gap-3 mt-4 md:mt-0">
                 {isAuthenticated && (
                   <Button 
@@ -398,7 +316,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                    <p className="text-3xl font-bold">{stat.value}</p>
+                    <p className={`font-bold ${stat.value === 'COMING SOON' ? 'text-lg text-teal-600' : 'text-3xl'}`}>{stat.value}</p>
                   </div>
                   <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                     <stat.icon className="w-6 h-6 text-gray-600" />
@@ -509,122 +427,14 @@ export default function DashboardPage() {
                       return dateA.getTime() - dateB.getTime()
                     })
                     .map((bookmark) => (
-                    <Card key={bookmark.bookmarkId} className="p-6">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            {bookmark.itemType === 'BOOKMARK' ? (
-                              <Plane className="w-5 h-5 text-blue-600" />
-                            ) : (
-                              <Search className="w-5 h-5 text-green-600" />
-                            )}
-                            <span className="font-semibold">{bookmark.title}</span>
-                            <span className={`px-2 py-1 text-xs rounded-full ${
-                              bookmark.itemType === 'BOOKMARK' 
-                                ? 'bg-blue-100 text-blue-700' 
-                                : 'bg-green-100 text-green-700'
-                            }`}>
-                              {bookmark.itemType === 'BOOKMARK' ? 'Flight' : 'Search'}
-                            </span>
-                          </div>
-                          
-                          {bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData ? (
-                            // Display parsed flight offer data
-                            (() => {
-                              const flightInfo = parseFlightOffer(bookmark.flightOfferData)
-                              return flightInfo ? (
-                                <>
-                                  <div className="text-gray-600 mb-2">
-                                    {flightInfo.route} • {flightInfo.date}
-                                    {flightInfo.price && <span className="ml-2 font-medium">{flightInfo.price}</span>}
-                                  </div>
-                                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                                    <Plane className="w-4 h-4" />
-                                    <span>Flight {flightInfo.flightNumber}</span>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="text-gray-600 mb-2">Flight details</div>
-                              )
-                            })()
-                          ) : bookmark.itemType === 'SAVED_SEARCH' && bookmark.origin && bookmark.destination ? (
-                            // Display saved search data using individual fields
-                            <>
-                              <div className="text-gray-600 mb-2">
-                                {bookmark.origin} → {bookmark.destination} • {bookmark.departureDate}
-                              </div>
-                              <div className="flex items-center gap-2 text-sm text-gray-500">
-                                <Search className="w-4 h-4" />
-                                <span>
-                                  {bookmark.travelClass ? formatTravelClassForDisplay(bookmark.travelClass) : 'Any class'}
-                                  {bookmark.airlineCode && ` • ${bookmark.airlineCode}`}
-                                  {bookmark.flightNumber && ` ${bookmark.flightNumber}`}
-                                </span>
-                              </div>
-                            </>
-                          ) : null}
-                        </div>
-                        
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="text-sm text-gray-500">
-                            Saved {(() => {
-                              try {
-                                // Handle both ISO strings and epoch timestamps
-                                let date: Date
-                                
-                                if (typeof bookmark.createdAt === 'string') {
-                                  // ISO string format
-                                  date = new Date(bookmark.createdAt)
-                                } else if (typeof bookmark.createdAt === 'number') {
-                                  // Epoch timestamp - check if it's in seconds or milliseconds
-                                  const timestamp = bookmark.createdAt
-                                  // If timestamp is less than year 2000 in milliseconds, it's probably in seconds
-                                  date = timestamp < 946684800000 ? new Date(timestamp * 1000) : new Date(timestamp)
-                                } else {
-                                  console.log('Unexpected createdAt type:', typeof bookmark.createdAt, bookmark.createdAt)
-                                  return 'Recently'
-                                }
-                                
-                                // Check if date is valid
-                                if (isNaN(date.getTime())) {
-                                  console.log('Invalid createdAt date:', bookmark.createdAt)
-                                  return 'Recently'
-                                }
-                                
-                                return date.toLocaleDateString()
-                              } catch (error) {
-                                console.log('Error parsing createdAt:', bookmark.createdAt, error)
-                                return 'Recently'
-                              }
-                            })()}
-                          </div>
-                          <div className="flex gap-2">
-                            {bookmark.itemType === 'SAVED_SEARCH' ? (
-                              <Button 
-                                variant="outline" 
-                                className="rounded-full bg-transparent text-sm"
-                                onClick={() => handleRunSearch(bookmark)}
-                              >
-                                Run Search
-                              </Button>
-                            ) : (
-                              <Button variant="outline" className="rounded-full bg-transparent text-sm">
-                                View Seats
-                              </Button>
-                            )}
-                            <Button 
-                              variant="outline" 
-                              className="rounded-full bg-transparent text-sm text-red-600 hover:text-red-700"
-                              onClick={() => handleDeleteClick(bookmark)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-1" />
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))
+                      <SavedItemCard
+                        key={bookmark.bookmarkId}
+                        bookmark={bookmark}
+                        onRunSearch={handleRunSearch}
+                        onDeleteClick={handleDeleteClick}
+                        parseFlightOffer={parseFlightOffer}
+                      />
+                    ))
                 ) : (
                   /* Real authenticated user empty state */
                   <Card className="p-12 text-center">
@@ -678,44 +488,17 @@ export default function DashboardPage() {
                     <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
                       <Bell className="w-6 h-6 text-gray-400" />
                     </div>
-                    <h3 className="font-semibold mb-2 text-gray-700">No notifications yet</h3>
-                    <p className="text-sm text-gray-500">You&apos;ll see notifications here when you create alerts</p>
+                    <h3 className="font-semibold mb-2 text-teal-600">COMING SOON</h3>
+                    <p className="text-sm text-gray-500">Notifications will appear here when you create alerts</p>
                   </div>
                 )}
               </Card>
 
-              {/* Quick Actions - Commented out, may be removed completely */}
-              {/* 
-              <Card className="p-6 mt-6">
-                <h3 className="font-semibold mb-4">Quick Actions</h3>
-                <div className="space-y-2">
-                  <Link href="/search">
-                    <Button variant="outline" className="w-full justify-start rounded-full bg-transparent cursor-pointer">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create New Alert
-                    </Button>
-                  </Link>
-                  <Link href="/search">
-                    <Button variant="outline" className="w-full justify-start rounded-full bg-transparent cursor-pointer">
-                      <Plane className="w-4 h-4 mr-2" />
-                      Search Flights
-                    </Button>
-                  </Link>
-                  <Link href="/pricing">
-                    <Button variant="outline" className="w-full justify-start rounded-full bg-transparent cursor-pointer">
-                      <TrendingDown className="w-4 h-4 mr-2" />
-                      View Pricing
-                    </Button>
-                  </Link>
-                </div>
-              </Card>
-              */}
             </div>
           </div>
         </div>
-      )}
 
-      {/* Delete Confirmation Modal */}
+        {/* Delete Confirmation Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -769,5 +552,5 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
