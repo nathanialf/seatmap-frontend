@@ -117,6 +117,27 @@ export interface APIFlightOffersResponse {
 }
 
 /**
+ * Flight Segment Data Structure (for multi-segment flights)
+ */
+export interface FlightSegment {
+  segmentIndex: number
+  carrier: string
+  flightNumber: string
+  route: string
+  departure: {
+    code: string
+    time: string
+  }
+  arrival: {
+    code: string
+    time: string
+  }
+  aircraft?: string
+  seatMapAvailable?: boolean
+  seatMapData?: Record<string, unknown> | null
+}
+
+/**
  * Frontend Flight Data Structure
  */
 export interface Flight {
@@ -139,6 +160,9 @@ export interface Flight {
   price: string
   stops: number
   connections: string[]
+  seatmapAvailable?: boolean
+  seatmapData?: Record<string, unknown> | null
+  segments?: FlightSegment[]
 }
 
 /**

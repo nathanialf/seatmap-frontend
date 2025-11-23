@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Plane, MapPin, Bell, Search, ArrowLeft, Calendar, Clock, Users, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react'
 import { 
   type FlightSearchParams,
-  type Flight 
+  type Flight,
+  type FlightSegment 
 } from "@/lib/api-helpers"
 import {
   Dialog,
@@ -22,20 +23,6 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from '@/hooks/useAuth'
-
-type DeckConfiguration = {
-  width: number
-  length: number
-  startSeatRow: number
-  endSeatRow: number
-  startWingsX: number
-  endWingsX: number
-  startWingsRow: number
-  endWingsRow: number
-  exitRowsX: number[]
-}
-
-type SeatAvailabilityStatus = "AVAILABLE" | "BLOCKED" | "OCCUPIED"
 
 type SeatStatus = "available" | "occupied" | "blocked" | "exit"
 
@@ -121,164 +108,6 @@ export default function SearchPage() {
   })
 
 
-  const deckConfig: DeckConfiguration = {
-    width: 6,
-    length: 24,
-    startSeatRow: 8,
-    endSeatRow: 31,
-    startWingsX: 1,
-    endWingsX: 8,
-    startWingsRow: 12,
-    endWingsRow: 20,
-    exitRowsX: [12, 20],
-  }
-
-  const fixedSeatMap: Record<string, SeatAvailabilityStatus> = {
-    "8A": "AVAILABLE",
-    "8B": "OCCUPIED",
-    "8C": "AVAILABLE",
-    "8D": "AVAILABLE",
-    "8E": "BLOCKED",
-    "8F": "AVAILABLE",
-    "9A": "OCCUPIED",
-    "9B": "AVAILABLE",
-    "9C": "AVAILABLE",
-    "9D": "BLOCKED",
-    "9E": "AVAILABLE",
-    "9F": "OCCUPIED",
-    "10A": "AVAILABLE",
-    "10B": "AVAILABLE",
-    "10C": "OCCUPIED",
-    "10D": "AVAILABLE",
-    "10E": "AVAILABLE",
-    "10F": "BLOCKED",
-    "11A": "BLOCKED",
-    "11B": "OCCUPIED",
-    "11C": "AVAILABLE",
-    "11D": "OCCUPIED",
-    "11E": "AVAILABLE",
-    "11F": "AVAILABLE",
-    "12A": "AVAILABLE",
-    "12B": "AVAILABLE",
-    "12C": "AVAILABLE",
-    "12D": "AVAILABLE",
-    "12E": "AVAILABLE",
-    "12F": "AVAILABLE",
-    "13A": "OCCUPIED",
-    "13B": "AVAILABLE",
-    "13C": "BLOCKED",
-    "13D": "AVAILABLE",
-    "13E": "OCCUPIED",
-    "13F": "AVAILABLE",
-    "14A": "AVAILABLE",
-    "14B": "BLOCKED",
-    "14C": "AVAILABLE",
-    "14D": "OCCUPIED",
-    "14E": "AVAILABLE",
-    "14F": "AVAILABLE",
-    "15A": "AVAILABLE",
-    "15B": "AVAILABLE",
-    "15C": "AVAILABLE",
-    "15D": "BLOCKED",
-    "15E": "AVAILABLE",
-    "15F": "OCCUPIED",
-    "16A": "OCCUPIED",
-    "16B": "AVAILABLE",
-    "16C": "AVAILABLE",
-    "16D": "BLOCKED",
-    "16E": "AVAILABLE",
-    "16F": "AVAILABLE",
-    "17A": "AVAILABLE",
-    "17B": "OCCUPIED",
-    "17C": "AVAILABLE",
-    "17D": "AVAILABLE",
-    "17E": "AVAILABLE",
-    "17F": "BLOCKED",
-    "18A": "BLOCKED",
-    "18B": "AVAILABLE",
-    "18C": "OCCUPIED",
-    "18D": "AVAILABLE",
-    "18E": "OCCUPIED",
-    "18F": "AVAILABLE",
-    "19A": "AVAILABLE",
-    "19B": "AVAILABLE",
-    "19C": "AVAILABLE",
-    "19D": "BLOCKED",
-    "19E": "AVAILABLE",
-    "19F": "OCCUPIED",
-    "20A": "AVAILABLE",
-    "20B": "AVAILABLE",
-    "20C": "AVAILABLE",
-    "20D": "AVAILABLE",
-    "20E": "AVAILABLE",
-    "20F": "AVAILABLE",
-    "21A": "OCCUPIED",
-    "21B": "BLOCKED",
-    "21C": "AVAILABLE",
-    "21D": "AVAILABLE",
-    "21E": "OCCUPIED",
-    "21F": "AVAILABLE",
-    "22A": "AVAILABLE",
-    "22B": "AVAILABLE",
-    "22C": "OCCUPIED",
-    "22D": "BLOCKED",
-    "22E": "AVAILABLE",
-    "22F": "AVAILABLE",
-    "23A": "AVAILABLE",
-    "23B": "OCCUPIED",
-    "23C": "AVAILABLE",
-    "23D": "AVAILABLE",
-    "23E": "AVAILABLE",
-    "23F": "BLOCKED",
-    "24A": "BLOCKED",
-    "24B": "AVAILABLE",
-    "24C": "AVAILABLE",
-    "24D": "OCCUPIED",
-    "24E": "AVAILABLE",
-    "24F": "AVAILABLE",
-    "25A": "AVAILABLE",
-    "25B": "AVAILABLE",
-    "25C": "BLOCKED",
-    "25D": "AVAILABLE",
-    "25E": "OCCUPIED",
-    "25F": "AVAILABLE",
-    "26A": "OCCUPIED",
-    "26B": "AVAILABLE",
-    "26C": "AVAILABLE",
-    "26D": "AVAILABLE",
-    "26E": "BLOCKED",
-    "26F": "OCCUPIED",
-    "27A": "AVAILABLE",
-    "27B": "BLOCKED",
-    "27C": "OCCUPIED",
-    "27D": "AVAILABLE",
-    "27E": "AVAILABLE",
-    "27F": "AVAILABLE",
-    "28A": "AVAILABLE",
-    "28B": "AVAILABLE",
-    "28C": "AVAILABLE",
-    "28D": "BLOCKED",
-    "28E": "OCCUPIED",
-    "28F": "AVAILABLE",
-    "29A": "OCCUPIED",
-    "29B": "AVAILABLE",
-    "29C": "AVAILABLE",
-    "29D": "AVAILABLE",
-    "29E": "AVAILABLE",
-    "29F": "BLOCKED",
-    "30A": "AVAILABLE",
-    "30B": "OCCUPIED",
-    "30C": "BLOCKED",
-    "30D": "AVAILABLE",
-    "30E": "AVAILABLE",
-    "30F": "AVAILABLE",
-    "31A": "AVAILABLE",
-    "31B": "AVAILABLE",
-    "31C": "AVAILABLE",
-    "31D": "OCCUPIED",
-    "31E": "BLOCKED",
-    "31F": "AVAILABLE",
-  }
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -399,8 +228,9 @@ export default function SearchPage() {
           });
           
           const transformedFlights = backendFlights.map((flight: Record<string, unknown>, index: number) => {
-          const carrierCode = flight.itineraries?.[0]?.segments?.[0]?.carrierCode || '';
-          const flightNum = flight.itineraries?.[0]?.segments?.[0]?.number || '';
+          const segments = flight.itineraries?.[0]?.segments || [];
+          const carrierCode = segments[0]?.carrierCode || '';
+          const flightNum = segments[0]?.number || '';
           const airlineName = dictionaries.carriers?.[carrierCode] || carrierCode || 'Unknown';
           
           return {
@@ -465,7 +295,37 @@ export default function SearchPage() {
             const segments = flight.itineraries?.[0]?.segments || [];
             if (segments.length <= 1) return [];
             return segments.slice(0, -1).map((segment: Record<string, unknown>) => (segment.arrival as Record<string, unknown>)?.iataCode).filter(Boolean);
-          })()
+          })(),
+          // Capture seatmap data from API response
+          seatmapAvailable: flight.seatMapAvailable || false,
+          seatmapData: flight.seatMap || null,
+          // Capture segment information (seatmap is at flight level, not segment level)
+          segments: segments.map((segment: any, segIndex: number) => ({
+            segmentIndex: segIndex,
+            carrier: segment.carrierCode || '',
+            flightNumber: `${segment.carrierCode || ''} ${segment.number || ''}`.trim(),
+            route: `${segment.departure?.iataCode || ''} → ${segment.arrival?.iataCode || ''}`,
+            departure: {
+              code: segment.departure?.iataCode || '',
+              time: segment.departure?.at ? new Date(segment.departure.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : ''
+            },
+            arrival: {
+              code: segment.arrival?.iataCode || '',
+              time: segment.arrival?.at ? new Date(segment.arrival.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : ''
+            },
+            aircraft: segment.aircraft?.code || undefined,
+            // For multi-segment flights, seatmap availability is at flight level
+            seatMapAvailable: flight.seatMapAvailable || false,
+            seatMapData: flight.seatMap || null
+          }))
           };
         })
         
@@ -530,27 +390,137 @@ export default function SearchPage() {
     }
   }, [hasSearched, from, to, date, airline, flightNumber, seatClass, fetchFlights]) // Re-run when URL params change
 
-  const getSeatStatus = (row: number, col: number): SeatStatus => {
-    if (deckConfig.exitRowsX.includes(row)) {
-      return "exit"
-    }
+  // Function to get seat status from actual API data
+  const getSeatStatusFromData = (seatNumber: string, seats: any[]): SeatStatus => {
+    const seat = seats.find(s => s.number === seatNumber)
+    if (!seat) return "available"
 
-    const seatLetter = getSeatLetter(col)
-    const seatNumber = `${row}${seatLetter}`
-    const fixedStatus = fixedSeatMap[seatNumber]
-
-    if (fixedStatus) {
-      if (fixedStatus === "AVAILABLE") return "available"
-      if (fixedStatus === "OCCUPIED") return "occupied"
-      if (fixedStatus === "BLOCKED") return "blocked"
-    }
-
+    const status = seat.travelerPricing?.[0]?.seatAvailabilityStatus
+    if (status === "AVAILABLE") return "available"
+    if (status === "OCCUPIED") return "occupied" 
+    if (status === "BLOCKED") return "blocked"
+    
     return "available"
   }
 
+  // Function to get seat letter from column index
   const getSeatLetter = (col: number): string => {
-    const letters = ["A", "B", "C", "D", "E", "F"]
+    const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"]
     return letters[col] || ""
+  }
+
+  // Function to render a single deck seatmap
+  const renderDeckSeatMap = (deck: any, deckIndex: number) => {
+    if (!deck?.deckConfiguration || !deck?.seats) {
+      return (
+        <div key={deckIndex} className="text-center py-8 text-gray-500">
+          <p>Deck configuration or seat data not available</p>
+        </div>
+      )
+    }
+
+    const config = deck.deckConfiguration
+    const seats = deck.seats || []
+    
+    return (
+      <div key={deckIndex} className="mb-8">
+        {/* Deck header */}
+        <div className="mb-4 text-center">
+          <h3 className="text-lg font-semibold text-gray-800">
+            {deck.deckType} Deck {deckIndex > 0 ? `(Segment ${deckIndex + 1})` : ''}
+          </h3>
+          <p className="text-sm text-gray-600">
+            Rows {config.startSeatRow}-{config.endSeatRow} • {config.width} seats wide
+          </p>
+        </div>
+
+        <div className="relative text-center">
+          {/* Aircraft nose */}
+          <div className="flex justify-center mb-1">
+            <div className="w-16 h-8 bg-gray-100 rounded-t-full border-2 border-gray-300"></div>
+          </div>
+
+          <div className="relative inline-block mx-auto">
+            {/* Wings (if configured) */}
+            {config.startWingsX && config.endWingsX && (
+              <>
+                <div
+                  className="absolute left-0 bg-gray-200 border border-gray-300"
+                  style={{
+                    top: `${(config.startWingsRow - config.startSeatRow) * 28}px`,
+                    height: `${(config.endWingsRow - config.startWingsRow + 1) * 28}px`,
+                    width: "80px",
+                    transform: "translateX(-80px)",
+                    clipPath: "polygon(100% 0%, 100% 100%, 0% 80%, 0% 20%)",
+                  }}
+                />
+                <div
+                  className="absolute right-0 bg-gray-200 border border-gray-300"
+                  style={{
+                    top: `${(config.startWingsRow - config.startSeatRow) * 28}px`,
+                    height: `${(config.endWingsRow - config.startWingsRow + 1) * 28}px`,
+                    width: "80px",
+                    transform: "translateX(80px)",
+                    clipPath: "polygon(0% 0%, 0% 100%, 100% 80%, 100% 20%)",
+                  }}
+                />
+              </>
+            )}
+
+            {/* Seat rows */}
+            {Array.from({ length: config.endSeatRow - config.startSeatRow + 1 }).map((_, rowIndex) => {
+              const actualRow = config.startSeatRow + rowIndex
+
+              return (
+                <div key={rowIndex} className="flex items-center justify-center gap-1 mb-0.5">
+                  <div className="w-6 text-center text-xs font-medium text-gray-500">{actualRow}</div>
+
+                  <div className="flex gap-0.5 items-center">
+                    {Array.from({ length: config.width }).map((_, colIndex) => {
+                      const seatLetter = getSeatLetter(colIndex)
+                      const seatNumber = `${actualRow}${seatLetter}`
+                      const seatStatus = getSeatStatusFromData(seatNumber, seats)
+                      const isExit = config.exitRowsX?.includes(actualRow)
+
+                      return (
+                        <div key={colIndex} className="flex items-center">
+                          {/* Aisle gap (typically after 3rd seat for narrow body) */}
+                          {colIndex === Math.floor(config.width / 2) && <div className="w-4"></div>}
+
+                          <div
+                            className={`w-7 h-7 rounded text-[10px] font-medium flex items-center justify-center transition-colors ${
+                              isExit
+                                ? "bg-black text-white"
+                                : seatStatus === "available"
+                                  ? "bg-green-200 text-green-800"
+                                  : seatStatus === "occupied"
+                                    ? "bg-red-200 text-red-800"
+                                    : seatStatus === "blocked"
+                                      ? "bg-gray-400 text-gray-700"
+                                      : "bg-green-200 text-green-800"
+                            }`}
+                            title={`Seat ${seatNumber} - ${isExit ? 'Exit Row' : seatStatus}`}
+                          >
+                            {seatLetter}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="w-6 text-center text-xs font-medium text-gray-500">{actualRow}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Aircraft tail */}
+          <div className="flex justify-center mt-1">
+            <div className="w-16 h-8 bg-gray-100 rounded-b-full border-2 border-gray-300"></div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Function to save search as bookmark
@@ -926,106 +896,132 @@ export default function SearchPage() {
               </div>
             </Card>
 
-            <Card className="p-4 sm:p-6">
-              <div className="mb-8 px-2 sm:px-0">
-                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm">
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-green-200 rounded flex-shrink-0"></div>
-                    <span className="whitespace-nowrap">Available</span>
+            {/* Multi-segment flight information */}
+            {flight.segments && flight.segments.length > 1 && (
+              <Card className="p-4">
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Plane className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-semibold text-gray-700">Multi-Segment Flight Details</span>
                   </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-red-200 rounded flex-shrink-0"></div>
-                    <span className="whitespace-nowrap">Occupied</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-gray-400 rounded flex-shrink-0"></div>
-                    <span className="whitespace-nowrap">Blocked</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                    <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-black rounded flex items-center justify-center text-white text-[10px] sm:text-xs font-bold flex-shrink-0">
-                      E
+                  <div className="mb-3 bg-blue-50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-3 h-3 rounded-full ${
+                        flight.seatmapAvailable ? 'bg-green-500' : 'bg-red-500'
+                      }`}></div>
+                      <span className={`text-sm font-medium ${
+                        flight.seatmapAvailable ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                        {flight.seatmapAvailable ? 'Seat Map Available for Entire Journey' : 'No Seat Map Available'}
+                      </span>
                     </div>
-                    <span className="whitespace-nowrap">Exit Row</span>
+                    <p className="text-xs text-gray-600">
+                      {flight.seatmapAvailable 
+                        ? 'The seat map covers the entire multi-segment journey with deck configurations for different aircraft.'
+                        : 'Seat map data is not available for this connecting flight.'}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700 mb-2">Flight Segments:</div>
+                    {flight.segments.map((segment: FlightSegment) => (
+                      <div key={segment.segmentIndex} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">{segment.flightNumber}</span>
+                            <span className="text-sm text-gray-600">{segment.route}</span>
+                            {segment.aircraft && (
+                              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">{segment.aircraft}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span>Departure: {segment.departure.time}</span>
+                          <span>Arrival: {segment.arrival.time}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              </Card>
+            )}
 
-              <div className="relative text-center">
-                <div className="flex justify-center mb-1">
-                  <div className="w-16 h-8 bg-gray-100 rounded-t-full border-2 border-gray-300"></div>
+            {/* Overall Seatmap Data JSON Display */}
+            {flight.seatmapData && (
+              <Card className="p-4">
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {flight.seatmapData.seats ? (
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    )}
+                    <span className="text-sm font-semibold text-gray-700">
+                      {flight.seatmapData.seats ? 'Seat Map Data Available' : 'Seat Map Structure (No Seat Data)'}
+                    </span>
+                  </div>
+                  <pre className="text-xs text-gray-600 overflow-x-auto bg-gray-50 rounded border p-3 max-h-60 overflow-y-auto">
+                    {JSON.stringify(flight.seatmapData, null, 2)}
+                  </pre>
                 </div>
+              </Card>
+            )}
 
-                <div className="relative inline-block mx-auto">
-                  <div
-                    className="absolute left-0 bg-gray-200 border border-gray-300"
-                    style={{
-                      top: `${(deckConfig.startWingsRow - deckConfig.startSeatRow) * 28}px`,
-                      height: `${(deckConfig.endWingsRow - deckConfig.startWingsRow + 1) * 28}px`,
-                      width: "80px",
-                      transform: "translateX(-80px)",
-                      clipPath: "polygon(100% 0%, 100% 100%, 0% 80%, 0% 20%)",
-                    }}
-                  />
+            {!flight.seatmapData && (
+              <Card className="p-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-sm font-semibold text-red-700">No Seat Map Data Available</span>
+                </div>
+              </Card>
+            )}
 
-                  <div
-                    className="absolute right-0 bg-gray-200 border border-gray-300"
-                    style={{
-                      top: `${(deckConfig.startWingsRow - deckConfig.startSeatRow) * 28}px`,
-                      height: `${(deckConfig.endWingsRow - deckConfig.startWingsRow + 1) * 28}px`,
-                      width: "80px",
-                      transform: "translateX(80px)",
-                      clipPath: "polygon(0% 0%, 0% 100%, 100% 80%, 100% 20%)",
-                    }}
-                  />
-
-                  {Array.from({ length: deckConfig.length }).map((_, rowIndex) => {
-                    const actualRow = deckConfig.startSeatRow + rowIndex
-
-                    return (
-                      <div key={rowIndex} className="flex items-center justify-center gap-1 mb-0.5">
-                        <div className="w-6 text-center text-xs font-medium text-gray-500">{actualRow}</div>
-
-                        <div className="flex gap-0.5 items-center">
-                          {Array.from({ length: deckConfig.width }).map((_, colIndex) => {
-                            const seatStatus = getSeatStatus(actualRow, colIndex)
-                            const seatLetter = getSeatLetter(colIndex)
-
-                            return (
-                              <div key={colIndex} className="flex items-center">
-                                {colIndex === 3 && <div className="w-4"></div>}
-
-                                <div
-                                  className={`w-7 h-7 rounded text-[10px] font-medium flex items-center justify-center transition-colors ${
-                                    seatStatus === "available"
-                                      ? "bg-green-200 text-green-800"
-                                      : seatStatus === "occupied"
-                                        ? "bg-red-200 text-red-800"
-                                        : seatStatus === "blocked"
-                                          ? "bg-gray-400 text-gray-700"
-                                          : seatStatus === "exit"
-                                            ? "bg-black text-white"
-                                            : "bg-green-200 text-green-800"
-                                  }`}
-                                  title={`Seat ${actualRow}${seatLetter} - ${seatStatus}`}
-                                >
-                                  {seatLetter}
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        <div className="w-6 text-center text-xs font-medium text-gray-500">{actualRow}</div>
+            {/* Actual Seat Map Visualization */}
+            {flight.seatmapData && flight.seatmapData.decks && Array.isArray(flight.seatmapData.decks) ? (
+              <Card className="p-4 sm:p-6">
+                {/* Legend */}
+                <div className="mb-8 px-2 sm:px-0">
+                  <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-green-200 rounded flex-shrink-0"></div>
+                      <span className="whitespace-nowrap">Available</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-red-200 rounded flex-shrink-0"></div>
+                      <span className="whitespace-nowrap">Occupied</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-gray-400 rounded flex-shrink-0"></div>
+                      <span className="whitespace-nowrap">Blocked</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-black rounded flex items-center justify-center text-white text-[10px] sm:text-xs font-bold flex-shrink-0">
+                        E
                       </div>
-                    )
-                  })}
+                      <span className="whitespace-nowrap">Exit Row</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex justify-center mt-1">
-                  <div className="w-16 h-8 bg-gray-100 rounded-b-full border-2 border-gray-300"></div>
+                {/* Render each deck (for multi-segment flights) */}
+                {flight.seatmapData.decks.map((deck: any, deckIndex: number) => 
+                  renderDeckSeatMap(deck, deckIndex)
+                )}
+              </Card>
+            ) : (
+              <Card className="p-4 sm:p-6">
+                <div className="text-center py-12">
+                  <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                    {flight.seatmapData ? 'Invalid Seat Map Data' : 'No Seat Map Available'}
+                  </h3>
+                  <p className="text-gray-500">
+                    {flight.seatmapData 
+                      ? 'The seat map data structure is not in the expected format.'
+                      : 'Seat map information is not available for this flight.'}
+                  </p>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            )}
           </div>
         </div>
       </div>
@@ -1521,6 +1517,7 @@ export default function SearchPage() {
                       </span>
                     </div>
                   </div>
+
                 </div>
 
                 <div className="flex flex-col gap-3">
