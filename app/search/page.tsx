@@ -23,35 +23,20 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from '@/hooks/useAuth'
+import { SeatmapRenderer, calculateSeatAvailability, getSeatStatusFromData } from "@/components/seatmap-renderer"
+import { FlightSearchForm } from "@/components/flight-search-form"
+import { FlightSegmentDisplay } from "@/components/flight-segment-display"
+import { FlightResultCard } from "@/components/flight-result-card"
+import { CompactSearchForm } from "@/components/compact-search-form"
+import { AlertSetupDialog, type FlightAlertDetails } from "@/components/alert-setup-dialog"
+import { 
+  formatTravelClassForDisplay, 
+  formatFlightDate, 
+  transformFlightData,
+  createFlightOfferData,
+  createSearchRequest
+} from "@/lib/flight-utils"
 
-type SeatStatus = "available" | "occupied" | "blocked" | "exit"
-
-// Define a type for flight details that will be used in the alert dialog
-type FlightAlertDetails = {
-  airline: string
-  flightNumber: string
-  from: string
-  to: string
-  date: string
-  departureTime: string
-  arrivalTime: string
-}
-
-// Helper function to format travel class for display
-function formatTravelClassForDisplay(travelClass: string): string {
-  switch (travelClass) {
-    case 'ECONOMY':
-      return 'Economy'
-    case 'PREMIUM_ECONOMY':
-      return 'Premium Economy'
-    case 'BUSINESS':
-      return 'Business'
-    case 'FIRST':
-      return 'First Class'
-    default:
-      return travelClass
-  }
-}
 
 export default function SearchPage() {
   const router = useRouter()
@@ -88,6 +73,7 @@ export default function SearchPage() {
 
   const [availabilityThreshold, setAvailabilityThreshold] = useState<number>(30)
   const [seatCountThreshold, setSeatCountThreshold] = useState<number>(30)
+
 
   const searchParams = {
     origin: from || "",
@@ -146,6 +132,19 @@ export default function SearchPage() {
     await fetchFlights(searchApiParams)
 
     setIsSearchFormExpanded(false)
+  }
+
+  // Handler for the new FlightSearchForm component
+  const handleFormSubmit = (searchParams: FlightSearchParams) => {
+    const params = new URLSearchParams()
+    params.set("from", searchParams.origin)
+    params.set("to", searchParams.destination)
+    params.set("date", searchParams.date)
+    if (searchParams.airline?.trim()) params.set("airline", searchParams.airline.trim())
+    if (searchParams.flightNumber?.trim()) params.set("flight", searchParams.flightNumber.trim())
+    if (searchParams.seatClass?.trim()) params.set("seatClass", searchParams.seatClass.trim())
+
+    router.push(`/search?${params.toString()}`)
   }
 
   const handleNewSearch = () => {
@@ -227,107 +226,7 @@ export default function SearchPage() {
             } : 'no flight'
           });
           
-          const transformedFlights = backendFlights.map((flight: Record<string, unknown>, index: number) => {
-          const segments = flight.itineraries?.[0]?.segments || [];
-          const carrierCode = segments[0]?.carrierCode || '';
-          const flightNum = segments[0]?.number || '';
-          const airlineName = dictionaries.carriers?.[carrierCode] || carrierCode || 'Unknown';
-          
-          return {
-            id: index + 1,
-            airline: airlineName,
-            flightNumber: `${carrierCode} ${flightNum}`.trim(),
-          departure: {
-            // Use first segment departure (origin)
-            city: (() => {
-              const departureCode = flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode;
-              // If dictionaries has location info, use cityCode, otherwise just use the airport code
-              return dictionaries?.locations?.[departureCode]?.cityCode || departureCode || '';
-            })(),
-            code: flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode || '',
-            time: flight.itineraries?.[0]?.segments?.[0]?.departure?.at ? 
-              new Date(flight.itineraries[0].segments[0].departure.at).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit', 
-                hour12: true
-              }) : ''
-          },
-          arrival: {
-            // Use last segment arrival (final destination)
-            city: (() => {
-              const segments = flight.itineraries?.[0]?.segments || [];
-              const lastSegment = segments[segments.length - 1];
-              const arrivalCode = lastSegment?.arrival?.iataCode;
-              return dictionaries.locations?.[arrivalCode]?.cityCode || arrivalCode || '';
-            })(),
-            code: (() => {
-              const segments = flight.itineraries?.[0]?.segments || [];
-              const lastSegment = segments[segments.length - 1];
-              return lastSegment?.arrival?.iataCode || '';
-            })(),
-            time: (() => {
-              const segments = flight.itineraries?.[0]?.segments || [];
-              const lastSegment = segments[segments.length - 1];
-              return lastSegment?.arrival?.at ?
-                new Date(lastSegment.arrival.at).toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true  
-                }) : '';
-            })()
-          },
-          duration: flight.itineraries?.[0]?.duration?.replace('PT', '')?.replace('H', 'h ')?.replace('M', 'm') || '',
-          date: flight.itineraries?.[0]?.segments?.[0]?.departure?.at ?
-            new Date(flight.itineraries[0].segments[0].departure.at).toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short', 
-              day: 'numeric',
-              year: 'numeric'
-            }) : '',
-          availableSeats: flight.numberOfBookableSeats || 0,
-          price: flight.price?.total ? `$${flight.price.total}` : '$0',
-          // Add connection information
-          stops: (() => {
-            const segments = flight.itineraries?.[0]?.segments || [];
-            return segments.length - 1; // Number of stops = segments - 1
-          })(),
-          connections: (() => {
-            const segments = flight.itineraries?.[0]?.segments || [];
-            if (segments.length <= 1) return [];
-            return segments.slice(0, -1).map((segment: Record<string, unknown>) => (segment.arrival as Record<string, unknown>)?.iataCode).filter(Boolean);
-          })(),
-          // Capture seatmap data from API response
-          seatmapAvailable: flight.seatMapAvailable || false,
-          seatmapData: flight.seatMap || null,
-          // Capture segment information (seatmap is at flight level, not segment level)
-          segments: segments.map((segment: any, segIndex: number) => ({
-            segmentIndex: segIndex,
-            carrier: segment.carrierCode || '',
-            flightNumber: `${segment.carrierCode || ''} ${segment.number || ''}`.trim(),
-            route: `${segment.departure?.iataCode || ''} → ${segment.arrival?.iataCode || ''}`,
-            departure: {
-              code: segment.departure?.iataCode || '',
-              time: segment.departure?.at ? new Date(segment.departure.at).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              }) : ''
-            },
-            arrival: {
-              code: segment.arrival?.iataCode || '',
-              time: segment.arrival?.at ? new Date(segment.arrival.at).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              }) : ''
-            },
-            aircraft: segment.aircraft?.code || undefined,
-            // For multi-segment flights, seatmap availability is at flight level
-            seatMapAvailable: flight.seatMapAvailable || false,
-            seatMapData: flight.seatMap || null
-          }))
-          };
-        })
+          const transformedFlights = transformFlightData(backendFlights, dictionaries)
         
         console.log('Transformation result:', {
           inputLength: Array.isArray(data.data) ? data.data.length : 'not array',
@@ -390,138 +289,8 @@ export default function SearchPage() {
     }
   }, [hasSearched, from, to, date, airline, flightNumber, seatClass, fetchFlights]) // Re-run when URL params change
 
-  // Function to get seat status from actual API data
-  const getSeatStatusFromData = (seatNumber: string, seats: any[]): SeatStatus => {
-    const seat = seats.find(s => s.number === seatNumber)
-    if (!seat) return "available"
 
-    const status = seat.travelerPricing?.[0]?.seatAvailabilityStatus
-    if (status === "AVAILABLE") return "available"
-    if (status === "OCCUPIED") return "occupied" 
-    if (status === "BLOCKED") return "blocked"
-    
-    return "available"
-  }
 
-  // Function to get seat letter from column index
-  const getSeatLetter = (col: number): string => {
-    const letters = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"]
-    return letters[col] || ""
-  }
-
-  // Function to render a single deck seatmap
-  const renderDeckSeatMap = (deck: any, deckIndex: number) => {
-    if (!deck?.deckConfiguration || !deck?.seats) {
-      return (
-        <div key={deckIndex} className="text-center py-8 text-gray-500">
-          <p>Deck configuration or seat data not available</p>
-        </div>
-      )
-    }
-
-    const config = deck.deckConfiguration
-    const seats = deck.seats || []
-    
-    return (
-      <div key={deckIndex} className="mb-8">
-        {/* Deck header */}
-        <div className="mb-4 text-center">
-          <h3 className="text-lg font-semibold text-gray-800">
-            {deck.deckType} Deck {deckIndex > 0 ? `(Segment ${deckIndex + 1})` : ''}
-          </h3>
-          <p className="text-sm text-gray-600">
-            Rows {config.startSeatRow}-{config.endSeatRow} • {config.width} seats wide
-          </p>
-        </div>
-
-        <div className="relative text-center">
-          {/* Aircraft nose */}
-          <div className="flex justify-center mb-1">
-            <div className="w-16 h-8 bg-gray-100 rounded-t-full border-2 border-gray-300"></div>
-          </div>
-
-          <div className="relative inline-block mx-auto">
-            {/* Wings (if configured) */}
-            {config.startWingsX && config.endWingsX && (
-              <>
-                <div
-                  className="absolute left-0 bg-gray-200 border border-gray-300"
-                  style={{
-                    top: `${(config.startWingsRow - config.startSeatRow) * 28}px`,
-                    height: `${(config.endWingsRow - config.startWingsRow + 1) * 28}px`,
-                    width: "80px",
-                    transform: "translateX(-80px)",
-                    clipPath: "polygon(100% 0%, 100% 100%, 0% 80%, 0% 20%)",
-                  }}
-                />
-                <div
-                  className="absolute right-0 bg-gray-200 border border-gray-300"
-                  style={{
-                    top: `${(config.startWingsRow - config.startSeatRow) * 28}px`,
-                    height: `${(config.endWingsRow - config.startWingsRow + 1) * 28}px`,
-                    width: "80px",
-                    transform: "translateX(80px)",
-                    clipPath: "polygon(0% 0%, 0% 100%, 100% 80%, 100% 20%)",
-                  }}
-                />
-              </>
-            )}
-
-            {/* Seat rows */}
-            {Array.from({ length: config.endSeatRow - config.startSeatRow + 1 }).map((_, rowIndex) => {
-              const actualRow = config.startSeatRow + rowIndex
-
-              return (
-                <div key={rowIndex} className="flex items-center justify-center gap-1 mb-0.5">
-                  <div className="w-6 text-center text-xs font-medium text-gray-500">{actualRow}</div>
-
-                  <div className="flex gap-0.5 items-center">
-                    {Array.from({ length: config.width }).map((_, colIndex) => {
-                      const seatLetter = getSeatLetter(colIndex)
-                      const seatNumber = `${actualRow}${seatLetter}`
-                      const seatStatus = getSeatStatusFromData(seatNumber, seats)
-                      const isExit = config.exitRowsX?.includes(actualRow)
-
-                      return (
-                        <div key={colIndex} className="flex items-center">
-                          {/* Aisle gap (typically after 3rd seat for narrow body) */}
-                          {colIndex === Math.floor(config.width / 2) && <div className="w-4"></div>}
-
-                          <div
-                            className={`w-7 h-7 rounded text-[10px] font-medium flex items-center justify-center transition-colors ${
-                              isExit
-                                ? "bg-black text-white"
-                                : seatStatus === "available"
-                                  ? "bg-green-200 text-green-800"
-                                  : seatStatus === "occupied"
-                                    ? "bg-red-200 text-red-800"
-                                    : seatStatus === "blocked"
-                                      ? "bg-gray-400 text-gray-700"
-                                      : "bg-green-200 text-green-800"
-                            }`}
-                            title={`Seat ${seatNumber} - ${isExit ? 'Exit Row' : seatStatus}`}
-                          >
-                            {seatLetter}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div className="w-6 text-center text-xs font-medium text-gray-500">{actualRow}</div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Aircraft tail */}
-          <div className="flex justify-center mt-1">
-            <div className="w-16 h-8 bg-gray-100 rounded-b-full border-2 border-gray-300"></div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // Function to save search as bookmark
   const saveSearchBookmark = async () => {
@@ -869,10 +638,14 @@ export default function SearchPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-gray-400" />
-                  {/* CHANGE: Added percentage of total seats available */}
                   <span className="text-green-600 font-medium">
-                    {flight.availableSeats} seats available ({Math.round((flight.availableSeats / 144) * 100)}% of
-                    the total)
+                    {(() => {
+                      if (flight.seatmapData?.seats) {
+                        const availability = calculateSeatAvailability(flight.seatmapData?.seats || [])
+                        return `${availability.available} seats available (${availability.percentage}% of ${availability.total} total)`
+                      }
+                      return `${flight.availableSeats} seats available (estimated)`
+                    })()}
                   </span>
                 </div>
                 {/* CHANGE: Fixed syntax error in cheapest tariffs display */}
@@ -896,54 +669,11 @@ export default function SearchPage() {
               </div>
             </Card>
 
-            {/* Multi-segment flight information */}
-            {flight.segments && flight.segments.length > 1 && (
-              <Card className="p-4">
-                <div className="mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Plane className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-semibold text-gray-700">Multi-Segment Flight Details</span>
-                  </div>
-                  <div className="mb-3 bg-blue-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`w-3 h-3 rounded-full ${
-                        flight.seatmapAvailable ? 'bg-green-500' : 'bg-red-500'
-                      }`}></div>
-                      <span className={`text-sm font-medium ${
-                        flight.seatmapAvailable ? 'text-green-700' : 'text-red-700'
-                      }`}>
-                        {flight.seatmapAvailable ? 'Seat Map Available for Entire Journey' : 'No Seat Map Available'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-600">
-                      {flight.seatmapAvailable 
-                        ? 'The seat map covers the entire multi-segment journey with deck configurations for different aircraft.'
-                        : 'Seat map data is not available for this connecting flight.'}
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-700 mb-2">Flight Segments:</div>
-                    {flight.segments.map((segment: FlightSegment) => (
-                      <div key={segment.segmentIndex} className="bg-gray-50 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">{segment.flightNumber}</span>
-                            <span className="text-sm text-gray-600">{segment.route}</span>
-                            {segment.aircraft && (
-                              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">{segment.aircraft}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>Departure: {segment.departure.time}</span>
-                          <span>Arrival: {segment.arrival.time}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Card>
-            )}
+            <FlightSegmentDisplay
+              segments={flight.segments}
+              seatmapData={flight.seatmapData}
+              seatmapAvailable={flight.seatmapAvailable}
+            />
 
             {/* Overall Seatmap Data JSON Display */}
             {flight.seatmapData && (
@@ -977,36 +707,7 @@ export default function SearchPage() {
 
             {/* Actual Seat Map Visualization */}
             {flight.seatmapData && flight.seatmapData.decks && Array.isArray(flight.seatmapData.decks) ? (
-              <Card className="p-4 sm:p-6">
-                {/* Legend */}
-                <div className="mb-8 px-2 sm:px-0">
-                  <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm">
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-green-200 rounded flex-shrink-0"></div>
-                      <span className="whitespace-nowrap">Available</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-red-200 rounded flex-shrink-0"></div>
-                      <span className="whitespace-nowrap">Occupied</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-gray-400 rounded flex-shrink-0"></div>
-                      <span className="whitespace-nowrap">Blocked</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                      <div className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 bg-black rounded flex items-center justify-center text-white text-[10px] sm:text-xs font-bold flex-shrink-0">
-                        E
-                      </div>
-                      <span className="whitespace-nowrap">Exit Row</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Render each deck (for multi-segment flights) */}
-                {flight.seatmapData.decks.map((deck: any, deckIndex: number) => 
-                  renderDeckSeatMap(deck, deckIndex)
-                )}
-              </Card>
+              <SeatmapRenderer seatmapData={flight.seatmapData} />
             ) : (
               <Card className="p-4 sm:p-6">
                 <div className="text-center py-12">
@@ -1039,125 +740,12 @@ export default function SearchPage() {
             <p className="text-gray-600">Find your perfect flight and track seat availability</p>
           </div>
 
-          <div className="bg-gray-50 rounded-2xl p-4 md:p-6 mb-6 md:mb-8">
-            <form onSubmit={handleSearch} className="space-y-6" suppressHydrationWarning={true}>
-              <div>
-                <Label htmlFor="origin" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Origin Airport *
-                </Label>
-                <Input
-                  id="origin"
-                  type="text"
-                  placeholder="Enter airport name or code (e.g., LAX or Los Angeles)"
-                  value={formInputs.origin}
-                  onChange={(e) => setFormInputs({ ...formInputs, origin: e.target.value.toUpperCase() })}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="destination" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Destination Airport *
-                </Label>
-                <Input
-                  id="destination"
-                  type="text"
-                  placeholder="Enter airport name or code (e.g., JFK or New York)"
-                  value={formInputs.destination}
-                  onChange={(e) => setFormInputs({ ...formInputs, destination: e.target.value.toUpperCase() })}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="date" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Flight Date *
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formInputs.date}
-                  onChange={(e) => setFormInputs({ ...formInputs, date: e.target.value })}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-sm font-medium text-gray-700 mb-4">Optional Information</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="airline" className="text-sm font-medium text-gray-600 mb-2 block">
-                      Airline Code
-                    </Label>
-                    <Input
-                      id="airline"
-                      type="text"
-                      placeholder="e.g., AA, DL, UA"
-                      value={formInputs.airline}
-                      onChange={(e) => setFormInputs({ ...formInputs, airline: e.target.value })}
-                      className="rounded-lg"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="flightNumber" className="text-sm font-medium text-gray-600 mb-2 block">
-                      Flight Number
-                    </Label>
-                    <Input
-                      id="flightNumber"
-                      type="text"
-                      placeholder="e.g., 1234"
-                      value={formInputs.flightNumber}
-                      onChange={(e) => setFormInputs({ ...formInputs, flightNumber: e.target.value })}
-                      className="rounded-lg"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="seatClass" className="text-sm font-medium text-gray-600 mb-2 block">
-                      Seat Class
-                    </Label>
-                    <select
-                      id="seatClass"
-                      value={formInputs.seatClass}
-                      onChange={(e) => setFormInputs({ ...formInputs, seatClass: e.target.value })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                    >
-                      <option value="">Select class</option>
-                      <option value="ECONOMY">Economy</option>
-                      <option value="PREMIUM_ECONOMY">Premium Economy</option>
-                      <option value="BUSINESS">Business</option>
-                      <option value="FIRST">First Class</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center">
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full py-6 text-lg cursor-pointer"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-5 h-5 mr-2" />
-                      Search Flights
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
+          <FlightSearchForm
+            initialValues={searchParams}
+            onSubmit={handleFormSubmit}
+            isLoading={isLoading}
+            className="mb-6 md:mb-8"
+          />
         </div>
       </div>
     )
@@ -1187,139 +775,11 @@ export default function SearchPage() {
           <span>Back</span>
         </button>
 
-        <div className="bg-gray-50 rounded-2xl p-4 md:p-6 md:mb-8 mb-1.5">
-          {!isSearchFormExpanded && (
-            <button
-              onClick={() => setIsSearchFormExpanded(true)}
-              className="md:hidden w-full flex items-center justify-between mb-4 bg-black text-white hover:bg-gray-800 rounded-full px-6 py-3 cursor-pointer transition-colors"
-            >
-              <span className="font-medium">New Search</span>
-              <ChevronDown className="w-5 h-5" />
-            </button>
-          )}
-
-          <form onSubmit={handleSearch} className={`${isSearchFormExpanded ? "block" : "hidden"} md:block space-y-4`} suppressHydrationWarning={true}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm text-gray-600 mb-2 block">From</label>
-                <Input
-                  type="text"
-                  value={formInputs.origin}
-                  onChange={(e) => setFormInputs({ ...formInputs, origin: e.target.value.toUpperCase() })}
-                  placeholder="e.g., LAX"
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 mb-2 block">To</label>
-                <Input
-                  type="text"
-                  value={formInputs.destination}
-                  onChange={(e) => setFormInputs({ ...formInputs, destination: e.target.value.toUpperCase() })}
-                  placeholder="e.g., JFK"
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 mb-2 block">Date</label>
-                <Input
-                  type="date"
-                  value={formInputs.date}
-                  onChange={(e) => setFormInputs({ ...formInputs, date: e.target.value })}
-                  required
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="text-xs text-gray-500 mb-1.5 block">Airline (Optional)</label>
-                <Input
-                  type="text"
-                  value={formInputs.airline}
-                  onChange={(e) => setFormInputs({ ...formInputs, airline: e.target.value })}
-                  placeholder="e.g., AA"
-                  className="rounded-lg text-sm h-10"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1.5 block">Flight Number (Optional)</label>
-                <Input
-                  type="text"
-                  value={formInputs.flightNumber}
-                  onChange={(e) => setFormInputs({ ...formInputs, flightNumber: e.target.value })}
-                  placeholder="e.g., 1234"
-                  className="rounded-lg text-sm h-10"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1.5 block">Seat Class (Optional)</label>
-                <select
-                  value={formInputs.seatClass}
-                  onChange={(e) => setFormInputs({ ...formInputs, seatClass: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 text-sm h-10 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                  suppressHydrationWarning={true}
-                >
-                  <option value="">Select class</option>
-                  <option value="ECONOMY">Economy</option>
-                  <option value="PREMIUM_ECONOMY">Premium Economy</option>
-                  <option value="BUSINESS">Business</option>
-                  <option value="FIRST">First Class</option>
-                </select>
-              </div>
-              <div className="hidden md:flex items-end">
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full cursor-pointer h-10"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    "New Search"
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {isSearchFormExpanded && (
-              <div className="md:hidden flex gap-3">
-                <Button
-                  type="button"
-                  onClick={() => setIsSearchFormExpanded(false)}
-                  variant="outline"
-                  className="flex-1 rounded-full cursor-pointer bg-transparent"
-                >
-                  <ChevronUp className="w-4 h-4 mr-2" />
-                  Collapse
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex-1 bg-black text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full cursor-pointer"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4 mr-2" />
-                      Search
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </form>
-        </div>
+        <CompactSearchForm
+          initialValues={searchParams}
+          onSubmit={handleFormSubmit}
+          isLoading={isLoading}
+        />
 
         <div className="mb-6 flex flex-col md:flex-row items-start md:items-center md:justify-between gap-4">
           <div>
@@ -1466,91 +926,14 @@ export default function SearchPage() {
               </div>
             ) : (
               flights.map((flight) => (
-            <Card key={flight.id} className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Plane className="w-5 h-5 text-gray-600" />
-                    <span className="font-semibold">{flight.airline}</span>
-                    <span className="text-sm text-gray-500">{flight.flightNumber}</span>
-                  </div>
-
-                  <div className="flex items-center gap-8">
-                    <div>
-                      <div className="text-2xl font-bold">{flight.departure.time}</div>
-                      <div className="text-sm text-gray-600">{flight.departure.code}</div>
-                      {flight.departure.city !== flight.departure.code && (
-                        <div className="text-xs text-gray-500">{flight.departure.city}</div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 flex flex-col items-center">
-                      <div className="text-xs text-gray-500 mb-1">{flight.duration}</div>
-                      <div className="w-full h-px bg-gray-300 relative">
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-2">
-                          <Plane className="w-4 h-4 text-gray-400 rotate-90" />
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {flight.stops === 0 ? 'Non-stop' : 
-                         flight.stops === 1 ? `1 stop in ${flight.connections[0]}` :
-                         `${flight.stops} stops`}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-2xl font-bold">{flight.arrival.time}</div>
-                      <div className="text-sm text-gray-600">{flight.arrival.code}</div>
-                      {flight.arrival.city !== flight.arrival.code && (
-                        <div className="text-xs text-gray-500">{flight.arrival.city}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      {/* CHANGE: Using Users icon for better consistency with page style */}
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-600">
-                        {flight.availableSeats} seats available ({Math.round((flight.availableSeats / 144) * 100)}% of
-                        the total)
-                      </span>
-                    </div>
-                  </div>
-
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <Button
-                    onClick={() => setSelectedFlightForSeatMap(flight.id)}
-                    className="bg-black text-white hover:bg-gray-800 rounded-full px-6 cursor-pointer"
-                  >
-                    View Seat Map
-                  </Button>
-                  {/* Only show Set Alert button for registered users */}
-                  {isUser && (
-                    <Button
-                      variant="outline"
-                      className="rounded-full px-6 bg-transparent text-black cursor-pointer"
-                      disabled={savingFlightBookmark === flight.id}
-                      onClick={() => handleSetAlert(flight.id)}
-                    >
-                      {savingFlightBookmark === flight.id ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Bell className="w-4 h-4 mr-2" />
-                          Set Alert
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </Card>
+                <FlightResultCard
+                  key={flight.id}
+                  flight={flight}
+                  isUser={isUser}
+                  savingFlightBookmark={savingFlightBookmark}
+                  onViewSeatMap={setSelectedFlightForSeatMap}
+                  onSetAlert={handleSetAlert}
+                />
               ))
             )}
           </div>
@@ -1713,136 +1096,16 @@ export default function SearchPage() {
         </Dialog>
 
         {/* Individual Flight Alert Dialog */}
-        <Dialog open={isAlertDialogOpen} onOpenChange={setIsAlertDialogOpen}>
-          <DialogContent className="sm:max-w-md max-h-[80vh] sm:max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Set Flight Alert</DialogTitle>
-              <DialogDescription>
-                Get notified when seat availability changes for this specific flight.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 pb-4 pt-0">
-              {selectedFlight && (
-                <div className="bg-gradient-to-br from-[#00BBA7]/10 to-[#00BBA7]/5 border border-[#00BBA7]/30 rounded-lg p-3 space-y-1.5">
-                  <p className="font-semibold text-gray-600 uppercase tracking-wide mb-1.5 text-xs">Alert Details</p>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 text-base">
-                      <Plane className="w-3.5 h-3.5 text-[#00BBA7]" />
-                      <span className="font-semibold text-gray-800">{selectedFlight.airline}</span>
-                      <span className="text-gray-600">{selectedFlight.flightNumber}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-base">
-                      <MapPin className="w-3.5 h-3.5 text-[#00BBA7]" />
-                      <span className="font-medium text-gray-700">
-                        {selectedFlight.from} → {selectedFlight.to}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-base">
-                      <Calendar className="w-3.5 h-3.5 text-[#00BBA7]" />
-                      <span className="text-gray-700">{selectedFlight.date}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-base">
-                      <Clock className="w-3.5 h-3.5 text-[#00BBA7]" />
-                      <span className="text-gray-700">
-                        {selectedFlight.departureTime} - {selectedFlight.arrivalTime}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <Label htmlFor="flight-cabin-select" className="text-sm font-medium">
-                  Select Cabin
-                </Label>
-                <Select value={selectedCabin} onValueChange={setSelectedCabin}>
-                  <SelectTrigger id="flight-cabin-select" className="rounded-lg">
-                    <SelectValue placeholder="Select cabin class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Cabins</SelectItem>
-                    <SelectItem value="first">First Class</SelectItem>
-                    <SelectItem value="business">Business Class</SelectItem>
-                    <SelectItem value="premium">Premium Economy</SelectItem>
-                    <SelectItem value="economy">Economy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* CHANGE: Updated threshold to "below" for flight-specific alerts with visual emphasis */}
-              <div className="space-y-3 pt-2 border-t border-gray-200">
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm font-medium text-gray-700">Availability Threshold (Optional)</Label>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
-                    Below Threshold
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 -mt-1">Get notified when availability drops below this level</p>
-
-                <div className="space-y-3">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Alert when availability drops <span className="font-semibold underline decoration-amber-400 decoration-2 underline-offset-2">below:</span></span>
-                      {/* CHANGE: Removed percentage display, showing only seat count */}
-                      <span className="text-lg font-semibold text-amber-600">
-                        {seatCountThreshold} seats
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="5"
-                      max="100"
-                      step="5"
-                      value={seatCountThreshold}
-                      onChange={(e) => setSeatCountThreshold(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-amber-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-amber-500 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
-                      style={{
-                        background: `linear-gradient(to right, #f59e0b 0%, #f59e0b ${(seatCountThreshold / 100) * 100}%, #e5e7eb ${(seatCountThreshold / 100) * 100}%, #e5e7eb 100%)`,
-                      }}
-                    />
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>5 seats</span>
-                      <span>50 seats</span>
-                      <span>100 seats</span>
-                    </div>
-                    <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded p-2">
-                      ⚠️ Get alerted when seat count drops <strong>below {seatCountThreshold} seats ({Math.round((seatCountThreshold / 144) * 100)}% of the total)</strong>, indicating limited seats remaining
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4 text-gray-500" />
-                  <span className="font-medium text-gray-700">Alert expires on departure:</span>
-                  <span className="text-gray-600">
-                    {selectedFlight?.date}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="flex-col sm:flex-row gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsAlertDialogOpen(false)}
-                className="rounded-full cursor-pointer"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmAlert}
-                className="bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer"
-              >
-                Confirm Alert
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <AlertSetupDialog
+          isOpen={isAlertDialogOpen}
+          onOpenChange={setIsAlertDialogOpen}
+          flightDetails={selectedFlight}
+          selectedCabin={selectedCabin}
+          onCabinChange={setSelectedCabin}
+          seatCountThreshold={seatCountThreshold}
+          onSeatCountThresholdChange={setSeatCountThreshold}
+          onConfirm={handleConfirmAlert}
+        />
       </div>
     </div>
   )
