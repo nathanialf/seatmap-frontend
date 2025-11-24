@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export interface FlightAlertDetails {
   airline: string
@@ -27,7 +26,6 @@ export interface FlightAlertDetails {
 }
 
 interface FlightAlertSettings {
-  selectedCabin: string
   seatCountThreshold: number
 }
 
@@ -35,8 +33,6 @@ interface FlightAlertDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   flightDetails: FlightAlertDetails | null
-  selectedCabin: string
-  onCabinChange: (cabin: string) => void
   seatCountThreshold: number
   onSeatCountThresholdChange: (threshold: number) => void
   onConfirm: (bookmarkName: string, setAlert: boolean, alertSettings?: FlightAlertSettings) => void
@@ -47,8 +43,6 @@ const FlightAlertDialog: React.FC<FlightAlertDialogProps> = ({
   isOpen,
   onOpenChange,
   flightDetails,
-  selectedCabin,
-  onCabinChange,
   seatCountThreshold,
   onSeatCountThresholdChange,
   onConfirm,
@@ -140,23 +134,6 @@ const FlightAlertDialog: React.FC<FlightAlertDialogProps> = ({
             </div>
           )}
 
-          <div className="space-y-3">
-            <Label htmlFor="flight-cabin-select" className="text-sm font-medium">
-              Select Cabin
-            </Label>
-            <Select value={selectedCabin} onValueChange={onCabinChange}>
-              <SelectTrigger id="flight-cabin-select" className="rounded-lg">
-                <SelectValue placeholder="Select cabin class" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cabins</SelectItem>
-                <SelectItem value="first">First Class</SelectItem>
-                <SelectItem value="business">Business Class</SelectItem>
-                <SelectItem value="premium">Premium Economy</SelectItem>
-                <SelectItem value="economy">Economy</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="space-y-3 pt-2 border-t border-gray-200">
             <div className="flex items-center gap-2">
@@ -192,9 +169,6 @@ const FlightAlertDialog: React.FC<FlightAlertDialogProps> = ({
                   <span>50 seats</span>
                   <span>100 seats</span>
                 </div>
-                <p className="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded p-2">
-                  ⚠️ Get alerted when seat count drops <strong>below {seatCountThreshold} seats ({Math.round((seatCountThreshold / 144) * 100)}% of the total)</strong>, indicating limited seats remaining
-                </p>
               </div>
             </div>
           </div>
@@ -227,7 +201,6 @@ const FlightAlertDialog: React.FC<FlightAlertDialogProps> = ({
               bookmarkName || (flightDetails ? `${flightDetails.flightNumber} • ${flightDetails.from} → ${flightDetails.to} • ${flightDetails.date}` : "Flight details"),
               setAlert,
               setAlert ? {
-                selectedCabin,
                 seatCountThreshold
               } : undefined
             )}

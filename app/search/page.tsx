@@ -41,7 +41,6 @@ export default function SearchPage() {
   const [selectedFlightForSeatMap, setSelectedFlightForSeatMap] = useState<number | null>(null)
   const [isAlertDialogOpen, setIsAlertDialogOpen] = useState(false)
   const [selectedFlightForAlert, setSelectedFlightForAlert] = useState<number | null>(null)
-  const [selectedCabin, setSelectedCabin] = useState("all")
   const [showAlertSuccess, setShowAlertSuccess] = useState(false)
   const [isSearchAlertDialogOpen, setIsSearchAlertDialogOpen] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<FlightAlertDetails | null>(null) // State to hold details for the flight alert dialog
@@ -192,19 +191,6 @@ export default function SearchPage() {
     }
   }, []) // Empty dependency array since fetchFlights doesn't depend on any props or state
 
-  // Populate form inputs with URL parameters when available
-  React.useEffect(() => {
-    if (from || to || date || airline || flightNumber || seatClass) {
-      setFormInputs({
-        origin: from || "",
-        destination: to || "",
-        date: date || "",
-        airline: airline || "",
-        flightNumber: flightNumber || "",
-        seatClass: seatClass || "",
-      })
-    }
-  }, [from, to, date, airline, flightNumber, seatClass])
 
   // Fetch flights on initial page load if search parameters are present
   React.useEffect(() => {
@@ -230,7 +216,7 @@ export default function SearchPage() {
     setIsSearchAlertDialogOpen(true)
   }
 
-  const handleConfirmSearchAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { selectedCabin: string; availabilityThreshold: number }) => {
+  const handleConfirmSearchAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { availabilityThreshold: number }) => {
     try {
       console.log('handleConfirmSearchAlert called with:', { bookmarkName, setAlert, alertSettings, isUser })
       
@@ -374,7 +360,7 @@ export default function SearchPage() {
     setIsAlertDialogOpen(true)
   }
 
-  const handleConfirmAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { selectedCabin: string; seatCountThreshold: number }) => {
+  const handleConfirmAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { seatCountThreshold: number }) => {
     try {
       // Create bookmark with custom name
       if (isUser && selectedFlightForAlert !== null) {
@@ -487,36 +473,21 @@ export default function SearchPage() {
                     {flight.departure.time} - {flight.arrival.time}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-gray-400" />
-                  <span className="text-green-600 font-medium">
-                    {(() => {
-                      if (flight.seatmapData?.seats) {
-                        const availability = calculateSeatAvailability(flight.seatmapData?.seats || [])
-                        return `${availability.available} seats available (${availability.percentage}% of ${availability.total} total)`
-                      }
-                      return `${flight.availableSeats} seats available (estimated)`
-                    })()}
-                  </span>
-                </div>
-                {/* CHANGE: Fixed syntax error in cheapest tariffs display */}
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                    />
-                  </svg>
-                  <span>{flight.cheapestTariffs} lowest-fare seats</span>
-                </div>
+                {/* Only show total seat availability for single segment flights */}
+                {flight.segments.length === 1 && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-400" />
+                    <span className="text-green-600 font-medium">
+                      {(() => {
+                        if (flight.seatmapData?.seats) {
+                          const availability = calculateSeatAvailability(flight.seatmapData?.seats || [])
+                          return `${availability.available} seats available (${availability.percentage}% of ${availability.total} total)`
+                        }
+                        return `${flight.availableSeats} seats available (estimated)`
+                      })()}
+                    </span>
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -794,8 +765,6 @@ export default function SearchPage() {
           isOpen={isSearchAlertDialogOpen}
           onOpenChange={setIsSearchAlertDialogOpen}
           searchParams={searchParams}
-          selectedCabin={selectedCabin}
-          onCabinChange={setSelectedCabin}
           availabilityThreshold={availabilityThreshold}
           onAvailabilityThresholdChange={setAvailabilityThreshold}
           onConfirm={handleConfirmSearchAlert}
@@ -806,8 +775,6 @@ export default function SearchPage() {
           isOpen={isAlertDialogOpen}
           onOpenChange={setIsAlertDialogOpen}
           flightDetails={selectedFlight}
-          selectedCabin={selectedCabin}
-          onCabinChange={setSelectedCabin}
           seatCountThreshold={seatCountThreshold}
           onSeatCountThresholdChange={setSeatCountThreshold}
           onConfirm={handleConfirmAlert}

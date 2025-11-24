@@ -14,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatTravelClassForDisplay } from "@/lib/flight-utils"
 
 export interface SearchParams {
@@ -27,7 +26,6 @@ export interface SearchParams {
 }
 
 interface SearchAlertSettings {
-  selectedCabin: string
   availabilityThreshold: number
 }
 
@@ -35,8 +33,6 @@ interface SearchAlertDialogProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   searchParams: SearchParams
-  selectedCabin: string
-  onCabinChange: (cabin: string) => void
   availabilityThreshold: number
   onAvailabilityThresholdChange: (threshold: number) => void
   onConfirm: (bookmarkName: string, setAlert: boolean, alertSettings?: SearchAlertSettings) => void
@@ -47,8 +43,6 @@ const SearchAlertDialog: React.FC<SearchAlertDialogProps> = ({
   isOpen,
   onOpenChange,
   searchParams,
-  selectedCabin,
-  onCabinChange,
   availabilityThreshold,
   onAvailabilityThresholdChange,
   onConfirm,
@@ -165,23 +159,6 @@ const SearchAlertDialog: React.FC<SearchAlertDialogProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label htmlFor="search-cabin-select" className="text-sm font-medium">
-              Select Cabin
-            </Label>
-            <Select value={selectedCabin} onValueChange={onCabinChange}>
-              <SelectTrigger id="search-cabin-select" className="rounded-lg">
-                <SelectValue placeholder="Select cabin class" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cabins</SelectItem>
-                <SelectItem value="first">First Class</SelectItem>
-                <SelectItem value="business">Business Class</SelectItem>
-                <SelectItem value="premium">Premium Economy</SelectItem>
-                <SelectItem value="economy">Economy</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="space-y-3 pt-2 border-t border-gray-200">
             <Label className="text-sm font-medium text-gray-700">Availability Threshold (Optional)</Label>
@@ -254,7 +231,6 @@ const SearchAlertDialog: React.FC<SearchAlertDialogProps> = ({
               bookmarkName || `${searchParams.origin} → ${searchParams.destination} • ${searchParams.date}`,
               setAlert,
               setAlert ? {
-                selectedCabin,
                 availabilityThreshold
               } : undefined
             )}
