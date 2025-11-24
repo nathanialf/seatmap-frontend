@@ -23,6 +23,7 @@ import {
   transformFlightData,
   createFlightOfferData
 } from "@/lib/flight-utils"
+import logger from "@/lib/logger"
 
 
 export default function SearchPage() {
@@ -110,7 +111,7 @@ export default function SearchPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        console.warn('Flight search validation issue:', {
+        logger.warn('Flight search validation issue:', {
           status: response.status,
           statusText: response.statusText,
           message: data.message,
@@ -123,7 +124,7 @@ export default function SearchPage() {
       }
 
       if (data.success && data.data) {
-        console.log('Transforming API response:', {
+        logger.log('Transforming API response:', {
           hasData: !!data.data,
           dataType: Array.isArray(data.data) ? 'array' : typeof data.data,
           dataLength: Array.isArray(data.data) ? data.data.length : 'not array',
@@ -143,7 +144,7 @@ export default function SearchPage() {
           const backendFlights = data.data.data || []; // Array of flight objects from backend
           const dictionaries = data.data.dictionaries || {}; // Carrier code to name mapping
           
-          console.log('About to transform flights:', {
+          logger.log('About to transform flights:', {
             backendFlightsCount: backendFlights.length,
             firstFlight: backendFlights[0] ? {
               hasItineraries: !!backendFlights[0].itineraries,
@@ -159,7 +160,7 @@ export default function SearchPage() {
           
           const transformedFlights = transformFlightData(backendFlights, dictionaries)
         
-        console.log('Transformation result:', {
+        logger.log('Transformation result:', {
           inputLength: Array.isArray(data.data) ? data.data.length : 'not array',
           outputLength: transformedFlights.length,
           sampleOutput: transformedFlights[0] ? Object.keys(transformedFlights[0]) : 'no output',
@@ -175,7 +176,7 @@ export default function SearchPage() {
         setFlights(transformedFlights)
         
         } catch (transformError) {
-          console.error('Transformation error:', transformError);
+          logger.error('Transformation error:', transformError);
           setError('Failed to process flight data');
           setFlights([]);
         }
@@ -183,7 +184,7 @@ export default function SearchPage() {
         throw new Error(data.message || 'Failed to fetch flights')
       }
     } catch (err) {
-      console.error('Flight search error:', err)
+      logger.error('Flight search error:', err)
       setError(err instanceof Error ? err.message : 'Failed to search for flights')
       setFlights([]) // Clear flights on error
     } finally {
@@ -218,7 +219,7 @@ export default function SearchPage() {
 
   const handleConfirmSearchAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { availabilityThreshold: number }) => {
     try {
-      console.log('handleConfirmSearchAlert called with:', { bookmarkName, setAlert, alertSettings, isUser })
+      logger.log('handleConfirmSearchAlert called with:', { bookmarkName, setAlert, alertSettings, isUser })
       
       // Create bookmark with custom name
       if (isUser) {
@@ -253,7 +254,7 @@ export default function SearchPage() {
           }
         }
         
-        console.log('Creating bookmark with data:', {
+        logger.log('Creating bookmark with data:', {
           itemType: 'SAVED_SEARCH',
           title: bookmarkName,
           searchRequest: searchRequest
@@ -272,34 +273,33 @@ export default function SearchPage() {
           }),
         })
 
-        console.log('Bookmark API response:', response.status, response.statusText)
+        logger.log('Bookmark API response:', response.status, response.statusText)
         
         if (!response.ok) {
           const errorText = await response.text()
-          console.error('Bookmark API error:', errorText)
+          logger.error('Bookmark API error:', errorText)
           throw new Error(`Failed to save bookmark: ${response.status}`)
         }
         
         const result = await response.json()
-        console.log('Bookmark created successfully:', result)
+        logger.log('Bookmark created successfully:', result)
       } else {
-        console.log('User not authenticated, skipping bookmark creation')
+        logger.log('User not authenticated, skipping bookmark creation')
       }
 
       // If alert was requested, log the alert settings (since alerts are under construction)
       if (setAlert && alertSettings) {
-        console.log("[v0] Search alert set for:", searchParams, "Alert settings:", alertSettings)
+        logger.log("[v0] Search alert set for:", searchParams, "Alert settings:", alertSettings)
       }
 
       setIsSearchAlertDialogOpen(false)
-      setSelectedCabin("all")
       setAvailabilityThreshold(30)
       setShowAlertSuccess(true)
       setTimeout(() => {
         setShowAlertSuccess(false)
       }, 3000)
     } catch (error) {
-      console.error('Failed to save search bookmark:', error)
+      logger.error('Failed to save search bookmark:', error)
       setBookmarkError('Failed to save search')
     } finally {
       setIsSavingBookmark(false)
@@ -368,7 +368,7 @@ export default function SearchPage() {
         const flight = flights.find((f) => f.id === selectedFlightForAlert)
         if (flight) {
           const flightOfferData = createFlightOfferData(flight)
-          console.log('Creating flight bookmark with data:', {
+          logger.log('Creating flight bookmark with data:', {
             itemType: 'BOOKMARK',
             title: bookmarkName,
             flightOfferData: flightOfferData
@@ -387,33 +387,32 @@ export default function SearchPage() {
             }),
           })
 
-          console.log('Flight bookmark API response:', response.status, response.statusText)
+          logger.log('Flight bookmark API response:', response.status, response.statusText)
           
           if (!response.ok) {
             const errorText = await response.text()
-            console.error('Flight bookmark API error:', errorText)
+            logger.error('Flight bookmark API error:', errorText)
             throw new Error(`Failed to save bookmark: ${response.status}`)
           }
           
           const result = await response.json()
-          console.log('Flight bookmark created successfully:', result)
+          logger.log('Flight bookmark created successfully:', result)
         }
       }
 
       // If alert was requested, log the alert settings (since alerts are under construction)
       if (setAlert && alertSettings) {
-        console.log("[v0] Alert set for flight:", selectedFlightForAlert, "Alert settings:", alertSettings)
+        logger.log("[v0] Alert set for flight:", selectedFlightForAlert, "Alert settings:", alertSettings)
       }
 
       setIsAlertDialogOpen(false)
-      setSelectedCabin("all")
       setSeatCountThreshold(50)
       setShowAlertSuccess(true)
       setTimeout(() => {
         setShowAlertSuccess(false)
       }, 3000)
     } catch (error) {
-      console.error('Failed to save flight bookmark:', error)
+      logger.error('Failed to save flight bookmark:', error)
       setBookmarkError('Failed to save flight')
     } finally {
       setSavingFlightBookmark(null)
@@ -446,7 +445,7 @@ export default function SearchPage() {
             </Button>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Seat Map Viewer</h1>
             <p className="text-gray-600">
-              {flight.airline} {flight.flightNumber} • {flight.departure.code} → {flight.arrival.code}
+              {flight.airline} {flight.flightNumber.split(' ')[1] || flight.flightNumber} • {flight.departure.code} → {flight.arrival.code}
             </p>
           </div>
 
@@ -477,7 +476,7 @@ export default function SearchPage() {
                 {flight.segments.length === 1 && (
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-400" />
-                    <span className="text-green-600 font-medium">
+                    <span className="text-teal-600 font-medium">
                       {(() => {
                         if (flight.seatmapData?.seats) {
                           const availability = calculateSeatAvailability(flight.seatmapData?.seats || [])
@@ -503,7 +502,7 @@ export default function SearchPage() {
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
                     {flight.seatmapData.seats ? (
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
                     ) : (
                       <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
                     )}
@@ -581,7 +580,7 @@ export default function SearchPage() {
         {showAlertSuccess && (
           <div className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="bg-white rounded-full shadow-lg border border-gray-200 px-4 py-2 md:px-6 md:py-3 flex items-center gap-2 md:gap-3 max-w-[90%] md:max-w-md">
-              <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+              <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0"></div>
               <p className="text-xs md:text-sm font-medium text-gray-900">
                 Alert set! Check your dashboard to <span className="whitespace-nowrap">manage it.</span>
               </p>
@@ -635,8 +634,8 @@ export default function SearchPage() {
           {/* CHANGE: Removed duplicate Set Search Alert button - keeping only the elegant banner below */}
         </div>
 
-        {/* Set Search Alert card - only show for registered users */}
-        {isUser && (
+        {/* Set Search Alert card - only show for registered users when there are flight results */}
+        {isUser && !isLoading && !error && flights.length > 0 && (
           <div className="mb-6 bg-white border-2 border-[#00BBA7] rounded-xl p-4 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -739,7 +738,7 @@ export default function SearchPage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">No flights found</h3>
                 <p className="text-gray-500 mb-4">Try adjusting your search criteria or search date.</p>
                 <Button 
-                  onClick={() => setIsSearchFormExpanded(true)}
+                  onClick={handleNewSearch}
                   variant="outline"
                   className="rounded-full"
                 >

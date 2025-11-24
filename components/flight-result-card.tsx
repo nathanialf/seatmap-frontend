@@ -7,6 +7,46 @@ import { Plane, Users, Bell, Loader2 } from 'lucide-react'
 import { calculateSeatAvailability } from "./seatmap-renderer"
 import type { Flight, FlightSegment } from "@/lib/api-helpers"
 
+// Helper function to determine flight availability status
+function getFlightAvailabilityStatus(flight: Flight): 'FULL' | 'PARTIALLY_FULL' | null {
+  if (!flight.seatmapData?.seats && !flight.segments) {
+    return null // No seatmap data available
+  }
+
+  const availabilities: number[] = []
+
+  if (flight.segments && flight.segments.length > 1) {
+    // Multi-segment flight - check each segment
+    flight.segments.forEach((segment: FlightSegment) => {
+      const segmentSeats = flight.seatmapData?.decks?.[segment.segmentIndex]?.seats || []
+      if (segmentSeats.length > 0) {
+        const segmentAvailability = calculateSeatAvailability(segmentSeats)
+        availabilities.push(segmentAvailability.available)
+      }
+    })
+  } else if (flight.seatmapData?.seats) {
+    // Single segment flight
+    const availability = calculateSeatAvailability(flight.seatmapData.seats)
+    availabilities.push(availability.available)
+  }
+
+  if (availabilities.length === 0) {
+    return null // No valid seatmap data
+  }
+
+  // Check if all segments have 0 seats available
+  if (availabilities.every(available => available === 0)) {
+    return 'FULL'
+  }
+  
+  // Check if at least one segment has 0 seats available
+  if (availabilities.some(available => available === 0)) {
+    return 'PARTIALLY_FULL'
+  }
+
+  return null // Flight has availability on all segments
+}
+
 interface FlightResultCardProps {
   flight: Flight
   isUser: boolean
@@ -31,6 +71,24 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
             <Plane className="w-5 h-5 text-gray-600" />
             <span className="font-semibold">{flight.airline}</span>
             <span className="text-sm text-gray-500">{flight.flightNumber}</span>
+            {(() => {
+              const status = getFlightAvailabilityStatus(flight)
+              if (status === 'FULL') {
+                return (
+                  <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">
+                    FULL
+                  </span>
+                )
+              }
+              if (status === 'PARTIALLY_FULL') {
+                return (
+                  <span className="px-2 py-1 text-xs font-semibold bg-orange-100 text-orange-800 rounded-full">
+                    PARTIALLY FULL
+                  </span>
+                )
+              }
+              return null
+            })()}
           </div>
 
           {/* Flight Times and Route */}
@@ -129,34 +187,52 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
-          <Button
-            onClick={() => onViewSeatMap(flight.id)}
-            className="bg-black text-white hover:bg-gray-800 rounded-full px-6 cursor-pointer"
-          >
-            View Seat Map
-          </Button>
-          
-          {/* Only show Set Alert button for registered users */}
-          {isUser && (
-            <Button
-              variant="outline"
-              className="rounded-full px-6 bg-transparent text-black cursor-pointer"
-              disabled={savingFlightBookmark === flight.id}
-              onClick={() => onSetAlert(flight.id)}
-            >
-              {savingFlightBookmark === flight.id ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Bell className="w-4 h-4 mr-2" />
-                  Set Alert
-                </>
-              )}
-            </Button>
-          )}
+          {(() => {
+            const status = getFlightAvailabilityStatus(flight)
+            const isUnavailable = status === 'FULL' || status === 'PARTIALLY_FULL'
+            
+            return (
+              <>
+                <Button
+                  onClick={() => onViewSeatMap(flight.id)}
+                  disabled={isUnavailable}
+                  className={`rounded-full px-6 ${
+                    isUnavailable 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : 'bg-black text-white hover:bg-gray-800 cursor-pointer'
+                  }`}
+                >
+                  View Seat Map
+                </Button>
+                
+                {/* Only show Set Alert button for registered users */}
+                {isUser && (
+                  <Button
+                    variant="outline"
+                    className={`rounded-full px-6 bg-transparent ${
+                      isUnavailable 
+                        ? 'text-gray-400 border-gray-300 cursor-not-allowed' 
+                        : 'text-black cursor-pointer'
+                    }`}
+                    disabled={savingFlightBookmark === flight.id || isUnavailable}
+                    onClick={() => onSetAlert(flight.id)}
+                  >
+                    {savingFlightBookmark === flight.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Bell className="w-4 h-4 mr-2" />
+                        Set Alert
+                      </>
+                    )}
+                  </Button>
+                )}
+              </>
+            )
+          })()}
         </div>
       </div>
     </Card>

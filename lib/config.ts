@@ -30,9 +30,9 @@ function getOptionalEnvVar(name: string, defaultValue: string): string {
 const config: Config = {
   apiBaseUrl: getRequiredEnvVar('API_BASE_URL'),
   apiKey: getRequiredEnvVar('API_KEY'),
-  environment: getOptionalEnvVar('ENVIRONMENT', 'development'),
+  environment: getOptionalEnvVar('ENVIRONMENT', 'dev'),
   get isDevelopment() {
-    return this.environment === 'development';
+    return this.environment === 'dev';
   },
   get isProduction() {
     return this.environment === 'production';

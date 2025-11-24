@@ -59,7 +59,11 @@ export function Navbar() {
               {isUser ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="cursor-pointer">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="cursor-pointer relative w-10 h-10 rounded-full border-2 !border-teal-500 hover:!bg-teal-500 hover:!border-teal-500 transition-colors"
+                    >
                       <User className="w-5 h-5" />
                       <span className="sr-only">Profile menu</span>
                     </Button>
@@ -131,13 +135,13 @@ export function Navbar() {
                         My Account
                       </div>
                       <Link href="/dashboard" onClick={handleMobileNavClick}>
-                        <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer">
+                        <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer border-2 !border-teal-500 hover:!bg-teal-500 hover:!border-teal-500 transition-colors">
                           <Settings className="w-4 h-4 mr-2" />
                           Dashboard
                         </Button>
                       </Link>
                       <Link href="/profile" onClick={handleMobileNavClick}>
-                        <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer">
+                        <Button variant="ghost" className="w-full text-sm justify-start cursor-pointer border-2 !border-teal-500 hover:!bg-teal-500 hover:!border-teal-500 transition-colors">
                           <User className="w-4 h-4 mr-2" />
                           Profile
                         </Button>

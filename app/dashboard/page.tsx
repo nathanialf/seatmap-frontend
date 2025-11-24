@@ -171,6 +171,7 @@ export default function DashboardPage() {
           flightNumber: `${segment.carrierCode} ${segment.number}`,
           route: `${segment.departure.iataCode} → ${segment.arrival.iataCode}`,
           date: new Date(segment.departure.at).toLocaleDateString('en-US', {
+            weekday: 'short',
             month: 'short',
             day: 'numeric',
             year: 'numeric'

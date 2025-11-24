@@ -1,4 +1,5 @@
 import type { FlightSearchParams, Flight } from "@/lib/api-helpers"
+import logger from "@/lib/logger"
 
 // Helper function to format travel class for display
 export function formatTravelClassForDisplay(travelClass: string): string {
@@ -162,7 +163,7 @@ export function createFlightOfferData(flight: Flight): Record<string, unknown> {
       arrivalAt = arrivalDateTime.toISOString()
     }
   } catch (parseError) {
-    console.warn('Failed to parse flight date/time:', parseError)
+    logger.warn('Failed to parse flight date/time:', parseError)
   }
 
   return {

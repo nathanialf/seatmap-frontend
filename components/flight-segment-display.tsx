@@ -58,11 +58,11 @@ const FlightSegmentDisplay: React.FC<FlightSegmentDisplayProps> = ({
         <div className="mb-3 bg-blue-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
             <div className={`w-3 h-3 rounded-full ${
-              hasFullSeatmap ? 'bg-green-500' : 
+              hasFullSeatmap ? 'bg-teal-500' : 
               hasPartialSeatmap ? 'bg-yellow-500' : 'bg-red-500'
             }`}></div>
             <span className={`text-sm font-medium ${
-              hasFullSeatmap ? 'text-green-700' : 
+              hasFullSeatmap ? 'text-teal-700' : 
               hasPartialSeatmap ? 'text-yellow-700' : 'text-red-700'
             }`}>
               {hasFullSeatmap ? 'Seat Map Available for Entire Journey' : 
@@ -105,7 +105,7 @@ const FlightSegmentDisplay: React.FC<FlightSegmentDisplayProps> = ({
                   {hasSegmentData ? (
                     <div className="flex items-center gap-1">
                       <Users className="w-3 h-3 text-gray-400" />
-                      <span className="text-xs text-green-600 font-medium">
+                      <span className="text-xs text-teal-600 font-medium">
                         {segmentAvailability!.available}/{segmentAvailability!.total} available
                       </span>
                     </div>
@@ -122,7 +122,7 @@ const FlightSegmentDisplay: React.FC<FlightSegmentDisplayProps> = ({
                   <span>Departure: {segment.departure.time}</span>
                   <span>Arrival: {segment.arrival.time}</span>
                   {segmentAvailability && segmentAvailability.total > 0 && (
-                    <span className="text-green-600">({segmentAvailability.percentage}% available)</span>
+                    <span className="text-teal-600">({segmentAvailability.percentage}% available)</span>
                   )}
                 </div>
               </div>

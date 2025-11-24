@@ -6,7 +6,7 @@ import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { User, Mail, Shield, AlertCircle, Loader2, LogOut, Settings, Trash2, Crown, Star, Zap } from 'lucide-react'
+import { User, Mail, Shield, AlertCircle, Loader2, LogOut, Settings, Trash2, Crown, Star, Zap, CheckCircle, XCircle } from 'lucide-react'
 
 interface ProfileData {
   email: string
@@ -303,9 +303,26 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email Address
                   </label>
-                  <div className="p-3 bg-gray-50 rounded-lg border flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    <p className="text-gray-900">{profile.email}</p>
+                  <div className="p-3 bg-gray-50 rounded-lg border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <p className="text-gray-900">{profile.email}</p>
+                    </div>
+                    {profile.emailVerified !== undefined && (
+                      <div className="flex items-center gap-1">
+                        {profile.emailVerified ? (
+                          <>
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span className="text-sm text-green-700 font-medium">Verified</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 text-red-600" />
+                            <span className="text-sm text-red-700 font-medium">Unverified</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

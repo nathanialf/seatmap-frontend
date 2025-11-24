@@ -4,6 +4,7 @@ import React from "react"
 import { Plane, Search, Bell, Trash2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import logger from "@/lib/logger"
 
 // Helper function to format travel class for display
 function formatTravelClassForDisplay(travelClass: string): string {
@@ -18,6 +19,41 @@ function formatTravelClassForDisplay(travelClass: string): string {
       return 'First Class'
     default:
       return travelClass
+  }
+}
+
+// Helper function to format dates consistently with flight search results
+function formatDateForDisplay(dateInput: string | number): string {
+  try {
+    let date: Date
+    
+    if (typeof dateInput === 'string') {
+      // Handle both ISO strings (2024-12-15) and full datetime strings
+      date = new Date(dateInput)
+    } else if (typeof dateInput === 'number') {
+      // Handle epoch timestamps
+      const timestamp = dateInput
+      // If timestamp is less than year 2000 in milliseconds, it's probably in seconds
+      date = timestamp < 946684800000 ? new Date(timestamp * 1000) : new Date(timestamp)
+    } else {
+      return 'Invalid date'
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'Invalid date'
+    }
+    
+    // Format to match flight search results: "Mon, Dec 15, 2024"
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric',
+      year: 'numeric'
+    })
+  } catch (error) {
+    logger.log('Error formatting date:', dateInput, error)
+    return 'Invalid date'
   }
 }
 
@@ -94,7 +130,7 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
             // Display saved search data using individual fields
             <>
               <div className="text-gray-600 mb-2">
-                {bookmark.origin} → {bookmark.destination} • {bookmark.departureDate}
+                {bookmark.origin} → {bookmark.destination} • {formatDateForDisplay(bookmark.departureDate || '')}
               </div>
               <div className="text-sm text-gray-500">
                 <span>
@@ -109,36 +145,7 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
         
         <div className="flex flex-col items-end gap-2">
           <div className="text-sm text-gray-500">
-            Saved {(() => {
-              try {
-                // Handle both ISO strings and epoch timestamps
-                let date: Date
-                
-                if (typeof bookmark.createdAt === 'string') {
-                  // ISO string format
-                  date = new Date(bookmark.createdAt)
-                } else if (typeof bookmark.createdAt === 'number') {
-                  // Epoch timestamp - check if it's in seconds or milliseconds
-                  const timestamp = bookmark.createdAt
-                  // If timestamp is less than year 2000 in milliseconds, it's probably in seconds
-                  date = timestamp < 946684800000 ? new Date(timestamp * 1000) : new Date(timestamp)
-                } else {
-                  console.log('Unexpected createdAt type:', typeof bookmark.createdAt, bookmark.createdAt)
-                  return 'Recently'
-                }
-                
-                // Check if date is valid
-                if (isNaN(date.getTime())) {
-                  console.log('Invalid createdAt date:', bookmark.createdAt)
-                  return 'Recently'
-                }
-                
-                return date.toLocaleDateString()
-              } catch (error) {
-                console.log('Error parsing createdAt:', bookmark.createdAt, error)
-                return 'Recently'
-              }
-            })()}
+            Saved {formatDateForDisplay(bookmark.createdAt)}
           </div>
           <div className="flex gap-2">
             {bookmark.itemType === 'SAVED_SEARCH' ? (
