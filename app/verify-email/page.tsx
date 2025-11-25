@@ -58,7 +58,7 @@ export default function VerifyEmailPage() {
             message: data.message || 'Email verification failed. The link may be expired or invalid.'
           })
         }
-      } catch (error) {
+      } catch {
         setVerificationState({
           status: 'error',
           message: 'Something went wrong while verifying your email. Please try again.'

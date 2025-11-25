@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 /**
  * Get a valid auth token from cookies
@@ -49,6 +49,9 @@ export async function DELETE(
   context: { params: Promise<{ bookmarkId: string }> }
 ) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     const params = await context.params;
     const { bookmarkId } = params;
     

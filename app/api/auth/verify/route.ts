@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 /**
  * GET /api/auth/verify?token={verification_token}
@@ -12,6 +12,9 @@ import config from '@/lib/config'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     // Extract token from query parameters
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');

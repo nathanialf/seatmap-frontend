@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 // These interfaces are for documentation - the actual response comes from backend
 
@@ -14,6 +14,9 @@ import config from '@/lib/config'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     // Parse request body
     const body = await request.json();
     

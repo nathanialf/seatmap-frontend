@@ -20,12 +20,29 @@ export async function GET() {
   });
 
   try {
-    console.log('Importing config...');
-    const { default: config } = await import('@/lib/config').catch(err => {
-      console.error('Config import failed in auth status:', err.message || err);
-      throw new Error(`Config loading failed: ${err.message}`);
-    });
-    console.log('Config loaded in auth status:', {
+    console.log('Creating config from environment variables...');
+    
+    // Create config object directly from environment variables
+    const apiBaseUrl = process.env.API_BASE_URL;
+    const apiKey = process.env.API_KEY;
+    const environment = process.env.ENVIRONMENT || 'dev';
+    
+    if (!apiBaseUrl) {
+      throw new Error('Missing required environment variable: API_BASE_URL');
+    }
+    if (!apiKey) {
+      throw new Error('Missing required environment variable: API_KEY');
+    }
+    
+    const config = {
+      apiBaseUrl,
+      apiKey,
+      environment,
+      isDevelopment: environment === 'dev',
+      isProduction: environment === 'production'
+    };
+    
+    console.log('Config created successfully in auth status:', {
       apiBaseUrl: config.apiBaseUrl,
       environment: config.environment,
     });

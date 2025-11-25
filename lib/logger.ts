@@ -4,9 +4,9 @@
  */
 
 interface Logger {
-  log: (message?: any, ...optionalParams: any[]) => void;
-  warn: (message?: any, ...optionalParams: any[]) => void;
-  error: (message?: any, ...optionalParams: any[]) => void;
+  log: (message?: unknown, ...optionalParams: unknown[]) => void;
+  warn: (message?: unknown, ...optionalParams: unknown[]) => void;
+  error: (message?: unknown, ...optionalParams: unknown[]) => void;
 }
 
 // Check if we're in development environment
@@ -15,17 +15,17 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Create conditional logger that only logs in development
 const logger: Logger = {
-  log: (message?: any, ...optionalParams: any[]) => {
+  log: (message?: unknown, ...optionalParams: unknown[]) => {
     if (isDevelopment) {
       console.log(message, ...optionalParams);
     }
   },
-  warn: (message?: any, ...optionalParams: any[]) => {
+  warn: (message?: unknown, ...optionalParams: unknown[]) => {
     if (isDevelopment) {
       console.warn(message, ...optionalParams);
     }
   },
-  error: (message?: any, ...optionalParams: any[]) => {
+  error: (message?: unknown, ...optionalParams: unknown[]) => {
     if (isDevelopment) {
       console.error(message, ...optionalParams);
     }

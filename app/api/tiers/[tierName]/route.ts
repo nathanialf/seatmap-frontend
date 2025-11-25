@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 /**
  * GET /api/tiers/[tierName]
@@ -15,6 +15,8 @@ export async function GET(
   { params }: { params: { tierName: string } }
 ) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
     const { tierName } = params
 
     if (!tierName) {

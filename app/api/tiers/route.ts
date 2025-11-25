@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 /**
  * GET /api/tiers
@@ -12,6 +12,9 @@ import config from '@/lib/config'
  */
 export async function GET(_request: NextRequest) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     console.log('Fetching all tiers information')
 
     // Make request to backend API (publicly accessible endpoint)

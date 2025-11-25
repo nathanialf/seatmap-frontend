@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 /**
  * GET /api/profile
@@ -13,6 +13,9 @@ import config from '@/lib/config'
  */
 export async function GET(_request: NextRequest) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     const cookieStore = await cookies()
     const tokenCookie = cookieStore.get('myseatmap_jwt_token')
     const expiryCookie = cookieStore.get('myseatmap_token_expires')

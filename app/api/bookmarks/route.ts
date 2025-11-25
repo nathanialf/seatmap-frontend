@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import config from '@/lib/config'
+import { createConfig } from '@/lib/config-runtime'
 
 // API Response types are handled by the backend and typed dynamically
 
@@ -48,6 +48,9 @@ async function getAuthToken(): Promise<string> {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type'); // Optional filter: BOOKMARK or SAVED_SEARCH
 
@@ -140,6 +143,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Create config from environment variables
+    const config = createConfig();
+    
     // Parse request body
     const body = await request.json();
     

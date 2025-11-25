@@ -33,7 +33,7 @@ interface GuestTokenResponse {
 /**
  * Get a valid auth token (user or guest) from cookies, or create fresh guest token
  */
-async function getAuthToken(config: any): Promise<string | { token: string; cookieData: Record<string, unknown> }> {
+async function getAuthToken(config: { apiBaseUrl: string; apiKey: string }): Promise<string | { token: string; cookieData: Record<string, unknown> }> {
   const cookieStore = await cookies();
   const tokenCookie = cookieStore.get('myseatmap_jwt_token');
   const expiryCookie = cookieStore.get('myseatmap_token_expires'); 
@@ -134,12 +134,29 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    console.log('Importing config...');
-    const { default: config } = await import('@/lib/config').catch(err => {
-      console.error('Config import failed:', err.message || err);
-      throw new Error(`Config loading failed: ${err.message}`);
-    });
-    console.log('Config loaded successfully:', {
+    console.log('Creating config from environment variables...');
+    
+    // Create config object directly from environment variables
+    const apiBaseUrl = process.env.API_BASE_URL;
+    const apiKey = process.env.API_KEY;
+    const environment = process.env.ENVIRONMENT || 'dev';
+    
+    if (!apiBaseUrl) {
+      throw new Error('Missing required environment variable: API_BASE_URL');
+    }
+    if (!apiKey) {
+      throw new Error('Missing required environment variable: API_KEY');
+    }
+    
+    const config = {
+      apiBaseUrl,
+      apiKey,
+      environment,
+      isDevelopment: environment === 'dev',
+      isProduction: environment === 'production'
+    };
+    
+    console.log('Config created successfully:', {
       apiBaseUrl: config.apiBaseUrl,
       environment: config.environment,
       isDevelopment: config.isDevelopment
