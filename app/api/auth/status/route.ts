@@ -5,14 +5,32 @@
 
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import config from '@/lib/config'
 
 /**
  * GET /api/auth/status
  * Check current authentication status
  */
 export async function GET() {
+  console.log('=== AUTH STATUS API START ===');
+  console.log('Environment check:', {
+    nodeEnv: process.env.NODE_ENV,
+    hasApiBaseUrl: !!process.env.API_BASE_URL,
+    hasApiKey: !!process.env.API_KEY,
+    apiBaseUrlValue: process.env.API_BASE_URL,
+  });
+
   try {
+    console.log('Importing config...');
+    const { default: config } = await import('@/lib/config').catch(err => {
+      console.error('Config import failed in auth status:', err.message || err);
+      throw new Error(`Config loading failed: ${err.message}`);
+    });
+    console.log('Config loaded in auth status:', {
+      apiBaseUrl: config.apiBaseUrl,
+      environment: config.environment,
+    });
+
+    console.log('Reading cookies...');
     const cookieStore = await cookies();
     const tokenCookie = cookieStore.get('myseatmap_jwt_token');
     const expiryCookie = cookieStore.get('myseatmap_token_expires');
@@ -88,12 +106,20 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Auth status check error:', error);
+    console.error('=== AUTH STATUS API ERROR ===');
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('Full error object:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Failed to check authentication status';
+    console.error('Returning auth status error response:', errorMessage);
     
     return NextResponse.json(
       {
         success: false,
-        message: 'Failed to check authentication status',
+        message: errorMessage,
         data: {
           isAuthenticated: false,
           isUser: false,
@@ -103,6 +129,11 @@ export async function GET() {
           expiresAt: null,
           userTier: null,
         },
+        meta: {
+          errorCode: 'AUTH_STATUS_ERROR',
+          timestamp: new Date().toISOString(),
+          errorType: error?.constructor?.name || 'UnknownError'
+        }
       },
       { status: 500 }
     );

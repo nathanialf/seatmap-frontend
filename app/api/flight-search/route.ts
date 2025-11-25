@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import config from '@/lib/config'
 import { prepareFlightSearchPayload, type FlightSearchParams } from '@/lib/api-helpers'
 
 // API Response types
@@ -34,7 +33,7 @@ interface GuestTokenResponse {
 /**
  * Get a valid auth token (user or guest) from cookies, or create fresh guest token
  */
-async function getAuthToken(): Promise<string | { token: string; cookieData: Record<string, unknown> }> {
+async function getAuthToken(config: any): Promise<string | { token: string; cookieData: Record<string, unknown> }> {
   const cookieStore = await cookies();
   const tokenCookie = cookieStore.get('myseatmap_jwt_token');
   const expiryCookie = cookieStore.get('myseatmap_token_expires'); 
@@ -124,9 +123,32 @@ async function getAuthToken(): Promise<string | { token: string; cookieData: Rec
  * Search for flights using the MySeatMap backend API
  */
 export async function POST(request: NextRequest) {
+  console.log('=== FLIGHT SEARCH API START ===');
+  console.log('Environment check:', {
+    nodeEnv: process.env.NODE_ENV,
+    hasApiBaseUrl: !!process.env.API_BASE_URL,
+    hasApiKey: !!process.env.API_KEY,
+    hasEnvironment: !!process.env.ENVIRONMENT,
+    apiBaseUrlValue: process.env.API_BASE_URL,
+    environmentValue: process.env.ENVIRONMENT
+  });
+
   try {
+    console.log('Importing config...');
+    const { default: config } = await import('@/lib/config').catch(err => {
+      console.error('Config import failed:', err.message || err);
+      throw new Error(`Config loading failed: ${err.message}`);
+    });
+    console.log('Config loaded successfully:', {
+      apiBaseUrl: config.apiBaseUrl,
+      environment: config.environment,
+      isDevelopment: config.isDevelopment
+    });
+
     // Parse request body
+    console.log('Parsing request body...');
     const body: FlightSearchParams = await request.json();
+    console.log('Request body parsed successfully:', body);
     
     // Validate required fields
     if (!body.origin || !body.destination || !body.date) {
@@ -141,7 +163,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get auth token (user or guest) for authentication (always required)
-    const authResult = await getAuthToken();
+    console.log('Getting auth token...');
+    const authResult = await getAuthToken(config);
+    console.log('Auth token result type:', typeof authResult);
     
     let authToken: string;
     let newCookieData: Record<string, unknown> | null = null;
@@ -279,13 +303,26 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Flight search API error:', error);
+    console.error('=== FLIGHT SEARCH API ERROR ===');
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error?.constructor?.name);
+    console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('Full error object:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    console.error('Returning error response:', errorMessage);
     
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : 'Internal server error',
+        message: errorMessage,
         data: null,
+        meta: {
+          errorCode: 'FLIGHT_SEARCH_ERROR',
+          timestamp: new Date().toISOString(),
+          errorType: error?.constructor?.name || 'UnknownError'
+        }
       },
       { status: 500 }
     );
