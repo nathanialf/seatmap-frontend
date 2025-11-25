@@ -36,7 +36,7 @@ export default function DashboardPage() {
   const [bookmarkToDelete, setBookmarkToDelete] = useState<BookmarkItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
-  const { isAuthenticated, isUser, isGuest, isLoading } = useAuth()
+  const { isAuthenticated, isUser, isGuest, isLoading, hasFreeTier } = useAuth()
 
   // Function to run a saved search
   const handleRunSearch = useCallback((bookmark: BookmarkItem) => {
@@ -436,8 +436,32 @@ export default function DashboardPage() {
                         parseFlightOffer={parseFlightOffer}
                       />
                     ))
+                ) : hasFreeTier ? (
+                  /* Free tier user - upgrade message */
+                  <Card className="p-12 text-center">
+                    <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                      <Bookmark className="w-6 h-6 text-teal-600" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-teal-700">Free Plan - Limited Features</h3>
+                    <p className="text-gray-600 mb-4">
+                      You can search for flights, but saving items requires a paid plan.
+                      Upgrade to save flights, searches, and set up alerts.
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
+                      <Link href="/search">
+                        <Button variant="outline" className="rounded-full cursor-pointer">
+                          Search Flights
+                        </Button>
+                      </Link>
+                      <Link href="/pricing">
+                        <Button className="bg-teal-600 text-white hover:bg-teal-700 rounded-full cursor-pointer">
+                          Upgrade Plan
+                        </Button>
+                      </Link>
+                    </div>
+                  </Card>
                 ) : (
-                  /* Real authenticated user empty state */
+                  /* Paid tier user empty state */
                   <Card className="p-12 text-center">
                     <Bookmark className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No saved items yet</h3>

@@ -47,7 +47,7 @@ export default function SearchPage() {
   const [selectedFlight, setSelectedFlight] = useState<FlightAlertDetails | null>(null) // State to hold details for the flight alert dialog
   
   // Auth and bookmark state
-  const { isUser } = useAuth()
+  const { isUser, hasFreeTier } = useAuth()
   const [isSavingBookmark, setIsSavingBookmark] = useState(false)
   const [bookmarkError, setBookmarkError] = useState<string | null>(null)
   const [savingFlightBookmark, setSavingFlightBookmark] = useState<number | null>(null)
@@ -634,13 +634,13 @@ export default function SearchPage() {
           {/* CHANGE: Removed duplicate Set Search Alert button - keeping only the elegant banner below */}
         </div>
 
-        {/* Set Search Alert card - only show for registered users when there are flight results */}
-        {isUser && !isLoading && !error && flights.length > 0 && (
-          <div className="mb-6 bg-white border-2 border-[#00BBA7] rounded-xl p-4 shadow-sm">
+        {/* Set Search Alert card - only show for registered users with paid tiers when there are flight results */}
+        {isUser && !hasFreeTier && !isLoading && !error && flights.length > 0 && (
+          <div className="mb-6 bg-white border-2 border-teal-600 rounded-xl p-4 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#00BBA7]/10 flex items-center justify-center flex-shrink-0">
-                  <Bell className="w-5 h-5 text-[#00BBA7]" />
+                <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-5 h-5 text-teal-600" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">Monitor All Flights on This Route</h3>
@@ -652,7 +652,7 @@ export default function SearchPage() {
               <Button
                 onClick={handleSetSearchAlert}
                 disabled={isSavingBookmark}
-                className="w-full md:w-auto bg-[#00BBA7] text-white hover:bg-[#009688] disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full px-6 py-3 cursor-pointer transition-all flex-shrink-0 whitespace-nowrap"
+                className="w-full md:w-auto bg-teal-600 text-white hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-full px-6 py-3 cursor-pointer transition-all flex-shrink-0 whitespace-nowrap"
               >
                 {isSavingBookmark ? (
                   <>
@@ -751,6 +751,7 @@ export default function SearchPage() {
                   key={flight.id}
                   flight={flight}
                   isUser={isUser}
+                  hasFreeTier={hasFreeTier}
                   savingFlightBookmark={savingFlightBookmark}
                   onViewSeatMap={setSelectedFlightForSeatMap}
                   onSetAlert={handleSetAlert}

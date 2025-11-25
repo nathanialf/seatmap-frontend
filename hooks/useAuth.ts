@@ -13,11 +13,13 @@ interface AuthState {
   userId: string | null
   expiresAt: number | null
   isLoading: boolean
+  userTier?: 'FREE' | 'PRO' | 'BUSINESS' | 'DEV' | null
 }
 
 interface AuthContextValue extends AuthState {
   refreshAuth: () => Promise<void>
   signOut: () => Promise<void>
+  hasFreeTier: boolean
 }
 
 export function useAuth(): AuthContextValue {
@@ -29,6 +31,7 @@ export function useAuth(): AuthContextValue {
     userId: null,
     expiresAt: null,
     isLoading: true,
+    userTier: undefined,
   })
 
   // Function to check authentication status
@@ -52,6 +55,7 @@ export function useAuth(): AuthContextValue {
           userId: result.data.userId,
           expiresAt: result.data.expiresAt,
           isLoading: false,
+          userTier: result.data.userTier,
         })
       } else {
         // Reset to unauthenticated state
@@ -63,6 +67,7 @@ export function useAuth(): AuthContextValue {
           userId: null,
           expiresAt: null,
           isLoading: false,
+          userTier: undefined,
         })
       }
     } catch (error) {
@@ -75,6 +80,7 @@ export function useAuth(): AuthContextValue {
         userId: null,
         expiresAt: null,
         isLoading: false,
+        userTier: undefined,
       })
     }
   }, [])
@@ -97,6 +103,7 @@ export function useAuth(): AuthContextValue {
           userId: null,
           expiresAt: null,
           isLoading: false,
+          userTier: undefined,
         })
         
         // Redirect to home page
@@ -137,9 +144,12 @@ export function useAuth(): AuthContextValue {
     }
   }, [authState.expiresAt, authState.isAuthenticated, refreshAuth])
 
+  const hasFreeTier = authState.userTier === 'FREE'
+
   return {
     ...authState,
     refreshAuth,
     signOut,
+    hasFreeTier,
   }
 }

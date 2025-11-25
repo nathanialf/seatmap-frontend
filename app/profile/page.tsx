@@ -381,7 +381,8 @@ export default function ProfilePage() {
                   </p>
                   <Button
                     variant="outline"
-                    className="rounded-full border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+                    disabled
+                    className="rounded-full border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
                     onClick={() => {
                       // TODO: Implement delete account functionality
                       console.log('Delete account clicked - functionality to be implemented')

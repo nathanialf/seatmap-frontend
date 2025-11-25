@@ -50,6 +50,7 @@ function getFlightAvailabilityStatus(flight: Flight): 'FULL' | 'PARTIALLY_FULL' 
 interface FlightResultCardProps {
   flight: Flight
   isUser: boolean
+  hasFreeTier?: boolean
   savingFlightBookmark?: number
   onViewSeatMap: (flightId: number) => void
   onSetAlert: (flightId: number) => void
@@ -58,12 +59,16 @@ interface FlightResultCardProps {
 const FlightResultCard: React.FC<FlightResultCardProps> = ({
   flight,
   isUser,
+  hasFreeTier = false,
   savingFlightBookmark,
   onViewSeatMap,
   onSetAlert
 }) => {
+  const status = getFlightAvailabilityStatus(flight)
+  const isUnavailable = status === 'FULL' || status === 'PARTIALLY_FULL'
+  
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
+    <Card className={`p-6 transition-shadow ${isUnavailable ? 'shadow-none' : 'hover:shadow-lg'}`}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div className="flex-1">
           {/* Flight Header */}
@@ -72,7 +77,6 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
             <span className="font-semibold">{flight.airline}</span>
             <span className="text-sm text-gray-500">{flight.flightNumber}</span>
             {(() => {
-              const status = getFlightAvailabilityStatus(flight)
               if (status === 'FULL') {
                 return (
                   <span className="px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">
@@ -188,9 +192,6 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
           {(() => {
-            const status = getFlightAvailabilityStatus(flight)
-            const isUnavailable = status === 'FULL' || status === 'PARTIALLY_FULL'
-            
             return (
               <>
                 <Button
@@ -205,14 +206,14 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
                   View Seat Map
                 </Button>
                 
-                {/* Only show Set Alert button for registered users */}
-                {isUser && (
+                {/* Only show Set Alert button for registered users with paid tiers */}
+                {isUser && !hasFreeTier && (
                   <Button
                     variant="outline"
                     className={`rounded-full px-6 bg-transparent ${
                       isUnavailable 
                         ? 'text-gray-400 border-gray-300 cursor-not-allowed' 
-                        : 'text-black cursor-pointer'
+                        : 'text-teal-600 border-teal-600 hover:bg-teal-50 cursor-pointer'
                     }`}
                     disabled={savingFlightBookmark === flight.id || isUnavailable}
                     onClick={() => onSetAlert(flight.id)}
