@@ -12,7 +12,129 @@ import Image from "next/image"
 
 export default function SignUpPage() {
   const router = useRouter()
-  const [isLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [message, setMessage] = useState('')
+
+  // Password validation function
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long'
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'Password must contain at least 1 uppercase letter'
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'Password must contain at least 1 lowercase letter'
+    }
+    if (!/\d/.test(password)) {
+      return 'Password must contain at least 1 number'
+    }
+    if (!/[!@#$%^&*]/.test(password)) {
+      return 'Password must contain at least 1 special character (!@#$%^&*)'
+    }
+    return null
+  }
+
+  // Form validation
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Required field validation
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = 'First name is required'
+    }
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = 'Last name is required'
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required'
+    }
+    if (!formData.password) {
+      newErrors.password = 'Password is required'
+    }
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password'
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (formData.email && !emailRegex.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
+    }
+
+    // Password validation
+    if (formData.password) {
+      const passwordError = validatePassword(formData.password)
+      if (passwordError) {
+        newErrors.password = passwordError
+      }
+    }
+
+    // Password confirmation validation
+    if (formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!validateForm()) {
+      return
+    }
+
+    setIsLoading(true)
+    setMessage('')
+
+    try {
+      // Make API call to Next.js API route
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          firstName: formData.firstName,
+          lastName: formData.lastName
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setMessage(data.message || 'Registration successful! Please check your email to verify your account.')
+        // Clear form on success
+        setFormData({
+          firstName: '',
+          lastName: '',
+          email: '',
+          password: '',
+          confirmPassword: ''
+        })
+      } else {
+        setMessage(data.message || 'Registration failed. Please try again.')
+      }
+    } catch (error) {
+      console.error('Registration error:', error)
+      setMessage(error instanceof Error ? error.message : 'Registration failed. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-gray-50">
@@ -33,33 +155,97 @@ export default function SignUpPage() {
           <p className="text-sm text-gray-600 mt-2">Get started with MySeatMap</p>
         </div>
 
-        <form className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input id="name" type="text" placeholder="John Doe" className="rounded-full" required />
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input 
+                id="firstName" 
+                type="text" 
+                placeholder="John" 
+                className="rounded-full" 
+                value={formData.firstName}
+                onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                required 
+              />
+              {errors.firstName && <p className="text-sm text-red-600">{errors.firstName}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input 
+                id="lastName" 
+                type="text" 
+                placeholder="Doe" 
+                className="rounded-full" 
+                value={formData.lastName}
+                onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                required 
+              />
+              {errors.lastName && <p className="text-sm text-red-600">{errors.lastName}</p>}
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="you@example.com" className="rounded-full" required />
+            <Input 
+              id="email" 
+              type="email" 
+              placeholder="you@example.com" 
+              className="rounded-full" 
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              required 
+            />
+            {errors.email && <p className="text-sm text-red-600">{errors.email}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" placeholder="••••••••" className="rounded-full" required />
+            <Input 
+              id="password" 
+              type="password" 
+              placeholder="••••••••" 
+              className="rounded-full" 
+              value={formData.password}
+              onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+              required 
+            />
+            {errors.password && <p className="text-sm text-red-600">{errors.password}</p>}
+            <p className="text-xs text-gray-500 mt-1">
+              Minimum 8 characters with uppercase, lowercase, number, and special character
+            </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm Password</Label>
-            <Input id="confirm-password" type="password" placeholder="••••••••" className="rounded-full" required />
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Input 
+              id="confirmPassword" 
+              type="password" 
+              placeholder="••••••••" 
+              className="rounded-full" 
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              required 
+            />
+            {errors.confirmPassword && <p className="text-sm text-red-600">{errors.confirmPassword}</p>}
           </div>
+
+          {message && (
+            <div className={`p-3 rounded-lg text-sm ${
+              message.includes('successful') || message.includes('check your email') 
+                ? 'bg-green-50 text-green-700 border border-green-200' 
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}>
+              {message}
+            </div>
+          )}
 
           <Button
             type="submit"
             disabled={isLoading}
             className="w-full bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer"
           >
-            Create Account
+            {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
         </form>
 

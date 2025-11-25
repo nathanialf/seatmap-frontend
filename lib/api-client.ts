@@ -161,7 +161,7 @@ class ApiClient {
   /**
    * Make an authenticated API request
    */
-  private async request<T = unknown>(
+  private async authenticatedFetch<T = unknown>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
@@ -195,7 +195,7 @@ class ApiClient {
    * Provides limited access (2 seat map views) without registration
    */
   async getGuestToken(): Promise<GuestTokenResponse> {
-    const response = await this.request<GuestTokenResponse>('/auth/guest', {
+    const response = await this.authenticatedFetch<GuestTokenResponse>('/auth/guest', {
       method: 'POST',
     });
 
@@ -218,7 +218,7 @@ class ApiClient {
    * Returns user token for full API access
    */
   async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await this.request<LoginResponse>('/auth/login', {
+    const response = await this.authenticatedFetch<LoginResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -292,7 +292,40 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     await this.ensureAuthenticated();
-    return this.request<T>(endpoint, options);
+    return this.authenticatedFetch<T>(endpoint, options);
+  }
+
+  /**
+   * Public method for making direct API requests (for auth endpoints)
+   */
+  async request<T = unknown>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<ApiResponse<T>> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers = {
+      'X-API-Key': this.apiKey,
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return data as ApiResponse<T>;
+    } catch (error) {
+      console.error(`API request failed for ${endpoint}:`, error);
+      throw error;
+    }
   }
 }
 
