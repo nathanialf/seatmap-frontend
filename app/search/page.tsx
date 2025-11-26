@@ -56,6 +56,10 @@ export default function SearchPage() {
   const [flights, setFlights] = useState<Flight[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false)
+  const [requestsMade, setRequestsMade] = useState(0) // Track number of API requests made
+  const [hasMorePages, setHasMorePages] = useState(true)
 
   const [availabilityThreshold, setAvailabilityThreshold] = useState<number>(30)
   const [seatCountThreshold, setSeatCountThreshold] = useState<number>(30)
@@ -84,6 +88,13 @@ export default function SearchPage() {
     if (searchParams.flightNumber?.trim()) params.set("flight", searchParams.flightNumber.trim())
     if (searchParams.seatClass?.trim()) params.set("seatClass", searchParams.seatClass.trim())
 
+    // Reset pagination state for new search
+    setFlights([])
+    setHasLoadedInitial(false)
+    setRequestsMade(0)
+    setHasMorePages(true)
+    setError(null)
+
     router.push(`/search?${params.toString()}`)
   }
 
@@ -91,13 +102,20 @@ export default function SearchPage() {
     router.push("/search")
     setFlights([]) // Clear flights
     setError(null) // Clear any errors
+    setHasLoadedInitial(false)
+    setRequestsMade(0)
+    setHasMorePages(true)
   }
 
   // Fetch flights from local API route
-  const fetchFlights = useCallback(async (searchParams: FlightSearchParams): Promise<void> => {
+  const fetchFlights = useCallback(async (searchParams: FlightSearchParams, append = false): Promise<void> => {
     try {
-      setIsLoading(true)
-      setError(null)
+      if (!append) {
+        setIsLoading(true)
+        setError(null)
+      } else {
+        setIsLoadingMore(true)
+      }
 
       // Make API call to local Next.js API route
       const response = await fetch('/api/flight-search', {
@@ -173,7 +191,31 @@ export default function SearchPage() {
           }))
         });
         
-        setFlights(transformedFlights)
+        if (append) {
+          setFlights(prev => [...prev, ...transformedFlights])
+        } else {
+          setFlights(transformedFlights)
+        }
+        
+        // Update pagination state
+        if (!append) {
+          // Initial load: first request complete
+          setHasLoadedInitial(true)
+          setRequestsMade(1)
+          
+          // Always continue loading more pages since backend filtering might 
+          // return fewer results on early pages but more on later pages
+          const hasMore = 1 < 5 // Always try all 5 pages (up to 50 results)
+          setHasMorePages(hasMore)
+        } else {
+          // Appending results: increment request counter
+          const newRequestCount = requestsMade + 1
+          setRequestsMade(newRequestCount)
+          
+          // Continue loading until we've tried all 5 pages
+          const hasMore = newRequestCount < 5
+          setHasMorePages(hasMore)
+        }
         
         } catch (transformError) {
           logger.error('Transformation error:', transformError);
@@ -186,16 +228,42 @@ export default function SearchPage() {
     } catch (err) {
       logger.error('Flight search error:', err)
       setError(err instanceof Error ? err.message : 'Failed to search for flights')
-      setFlights([]) // Clear flights on error
+      if (!append) {
+        setFlights([]) // Only clear flights on error if not appending
+      }
     } finally {
-      setIsLoading(false)
+      if (!append) {
+        setIsLoading(false)
+      } else {
+        setIsLoadingMore(false)
+      }
     }
-  }, []) // Empty dependency array since fetchFlights doesn't depend on any props or state
+  }, [requestsMade]) // Include requestsMade since it's used in the function logic
 
+  // Function to load more flights seamlessly
+  const loadMoreFlights = useCallback(async () => {
+    if (!hasMorePages || isLoadingMore || !hasLoadedInitial) return
+    
+    // Calculate offset based on number of requests made: requestsMade * 10
+    const offsetToUse = requestsMade * 10
+    
+    const searchApiParams: FlightSearchParams = {
+      origin: from || "",
+      destination: to || "",
+      date: date || "",
+      airline: airline || undefined,
+      flightNumber: flightNumber || undefined,
+      seatClass: seatClass || undefined,
+      offset: offsetToUse,
+    }
+    
+    await fetchFlights(searchApiParams, true) // append = true
+  }, [from, to, date, airline, flightNumber, seatClass, requestsMade, hasMorePages, isLoadingMore, hasLoadedInitial, fetchFlights])
 
   // Fetch flights on initial page load if search parameters are present
   React.useEffect(() => {
-    if (hasSearched && from && to && date) {
+    // Only fetch if we haven't loaded initial results yet and we have search params
+    if (hasSearched && from && to && date && !hasLoadedInitial) {
       const searchApiParams: FlightSearchParams = {
         origin: from,
         destination: to,
@@ -203,10 +271,22 @@ export default function SearchPage() {
         airline: airline || undefined,
         flightNumber: flightNumber || undefined,
         seatClass: seatClass || undefined,
+        offset: 0, // Always start from offset 0 for initial search
       }
-      fetchFlights(searchApiParams)
+      fetchFlights(searchApiParams) // This will be append=false, which is correct for initial load
     }
-  }, [hasSearched, from, to, date, airline, flightNumber, seatClass, fetchFlights]) // Re-run when URL params change
+  }, [hasSearched, from, to, date, airline, flightNumber, seatClass, hasLoadedInitial, fetchFlights]) // Added hasLoadedInitial to dependencies
+
+  // Auto-load more flights after initial search completes
+  React.useEffect(() => {
+    if (hasLoadedInitial && hasMorePages && !isLoadingMore && !isLoading) {
+      const timer = setTimeout(() => {
+        loadMoreFlights()
+      }, 1000) // Slightly longer delay so users can see the indicator
+      
+      return () => clearTimeout(timer)
+    }
+  }, [hasLoadedInitial, hasMorePages, isLoadingMore, isLoading, loadMoreFlights])
 
 
 
@@ -599,7 +679,7 @@ export default function SearchPage() {
         <CompactSearchForm
           initialValues={searchParams}
           onSubmit={handleFormSubmit}
-          isLoading={isLoading}
+          isLoading={isLoading && !hasLoadedInitial}
         />
 
         <div className="mb-6 flex flex-col md:flex-row items-start md:items-center md:justify-between gap-4">
@@ -635,7 +715,7 @@ export default function SearchPage() {
         </div>
 
         {/* Set Search Alert card - only show for registered users with paid tiers when there are flight results */}
-        {isUser && !hasFreeTier && !isLoading && !error && flights.length > 0 && (
+        {isUser && !hasFreeTier && (hasLoadedInitial || (!isLoading && !error)) && flights.length > 0 && (
           <div className="mb-6 bg-white border-2 border-teal-600 rounded-xl p-4 shadow-sm">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="flex items-start gap-3">
@@ -681,8 +761,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Loading State */}
-        {isLoading && (
+        {/* Loading State - Only show for initial search, not when loading more */}
+        {isLoading && !hasLoadedInitial && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-4" />
             <p className="text-gray-600">Searching for flights...</p>
@@ -720,17 +800,52 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Results Count */}
-        {!isLoading && !error && (
+        {/* Results Count - Show when we have initial results or when not loading initially */}
+        {(hasLoadedInitial || (!isLoading && !error)) && (
           <div className="mb-6">
-            <p className="text-sm text-gray-600">
-              {flights.length === 0 ? "No flights found" : `${flights.length} flights found`}
-            </p>
+            <div className="text-sm text-gray-600 flex items-center gap-2">
+              {flights.length === 0 ? (
+                <>
+                  <span>No flights found</span>
+                  {isLoadingMore && (
+                    <span className="flex items-center text-teal-600 bg-teal-50 px-2 py-1 rounded-full text-xs font-medium">
+                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                      Loading more...
+                    </span>
+                  )}
+                  {hasMorePages && !isLoadingMore && (
+                    <span className="flex items-center text-blue-600 bg-blue-50 px-2 py-1 rounded-full text-xs font-medium">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse inline-block"></span>
+                      Searching more pages...
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span>{flights.length} flights found</span>
+                  {isLoadingMore && (
+                    <span className="flex items-center text-teal-600 bg-teal-50 px-2 py-1 rounded-full text-xs font-medium">
+                      <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                      Loading more...
+                    </span>
+                  )}
+                  {hasMorePages && !isLoadingMore && (
+                    <span className="flex items-center text-blue-600 bg-blue-50 px-2 py-1 rounded-full text-xs font-medium">
+                      <span className="w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse inline-block"></span>
+                      Searching more pages...
+                    </span>
+                  )}
+                  {!hasMorePages && !isLoadingMore && flights.length > 0 && (
+                    <span className="text-gray-500 text-xs">(all pages searched)</span>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Flight Results */}
-        {!isLoading && !error && (
+        {/* Flight Results - Show when we have initial results or when not loading initially */}
+        {(hasLoadedInitial || (!isLoading && !error)) && (
           <div className="space-y-4">
             {flights.length === 0 ? (
               <div className="text-center py-12">

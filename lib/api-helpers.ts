@@ -10,6 +10,7 @@ export interface FlightSearchParams {
   airline?: string
   flightNumber?: string
   seatClass?: string
+  offset?: number
 }
 
 export interface FlightOffersAPIPayload {
@@ -20,6 +21,7 @@ export interface FlightOffersAPIPayload {
   airlineCode?: string
   flightNumber?: string
   maxResults?: number
+  offset?: number
   includeRawFlightOffer?: boolean
 }
 
@@ -82,6 +84,11 @@ export function prepareFlightSearchPayload(params: FlightSearchParams): FlightOf
   // Handle optional seatClass field - pass through directly since frontend now uses API values
   if (params.seatClass) {
     payload.travelClass = params.seatClass.trim()
+  }
+
+  // Handle optional offset for pagination
+  if (params.offset !== undefined) {
+    payload.offset = params.offset
   }
 
   return payload
