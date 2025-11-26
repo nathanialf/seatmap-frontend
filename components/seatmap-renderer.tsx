@@ -31,8 +31,6 @@ interface DeckData {
     startSeatRow: number
     endSeatRow: number
     width: number
-    startWingsX?: number
-    endWingsX?: number
     startWingsRow?: number
     endWingsRow?: number
   }
@@ -195,31 +193,49 @@ const DeckSeatmap: React.FC<{
         </div>
 
         <div className="relative inline-block mx-auto">
-          {/* Wings (if configured) */}
-          {config.startWingsX && config.endWingsX && (
-            <>
-              <div
-                className="absolute left-0 bg-gray-200 border border-gray-300"
-                style={{
-                  top: `${(config.startWingsRow! - config.startSeatRow) * 28}px`,
-                  height: `${(config.endWingsRow! - config.startWingsRow! + 1) * 28}px`,
-                  width: "80px",
-                  transform: "translateX(-80px)",
-                  clipPath: "polygon(100% 0%, 100% 100%, 0% 80%, 0% 20%)",
-                }}
-              />
-              <div
-                className="absolute right-0 bg-gray-200 border border-gray-300"
-                style={{
-                  top: `${(config.startWingsRow! - config.startSeatRow) * 28}px`,
-                  height: `${(config.endWingsRow! - config.startWingsRow! + 1) * 28}px`,
-                  width: "80px",
-                  transform: "translateX(80px)",
-                  clipPath: "polygon(0% 0%, 0% 100%, 100% 80%, 100% 20%)",
-                }}
-              />
-            </>
-          )}
+          {/* Wings (if configured) - position based on actual coordinate mapping */}
+          {config.startWingsRow && config.endWingsRow && (() => {
+            // Find the coordinate indices that correspond to the wing row numbers
+            const wingStartIndex = xCoords.findIndex(xCoord => {
+              const rowSeats = seatsWithCoords.filter(seat => seat.coordinates.x === xCoord)
+              const actualRow = rowSeats.length > 0 ? parseInt(rowSeats[0].number.match(/\d+/)?.[0] || '0') : config.startSeatRow + xCoord
+              return actualRow >= config.startWingsRow
+            })
+            
+            const wingEndIndex = xCoords.findIndex(xCoord => {
+              const rowSeats = seatsWithCoords.filter(seat => seat.coordinates.x === xCoord)
+              const actualRow = rowSeats.length > 0 ? parseInt(rowSeats[0].number.match(/\d+/)?.[0] || '0') : config.startSeatRow + xCoord
+              return actualRow > config.endWingsRow
+            })
+            
+            const startIndex = wingStartIndex >= 0 ? wingStartIndex : 0
+            const endIndex = wingEndIndex >= 0 ? wingEndIndex - 1 : xCoords.length - 1
+            
+            return (
+              <>
+                <div
+                  className="absolute left-0 bg-gray-200 border border-gray-300"
+                  style={{
+                    top: `${startIndex * 28}px`,
+                    height: `${(endIndex - startIndex + 1) * 28}px`,
+                    width: "80px",
+                    transform: "translateX(-80px)",
+                    clipPath: "polygon(100% 0%, 100% 100%, 0% 80%, 0% 20%)",
+                  }}
+                />
+                <div
+                  className="absolute right-0 bg-gray-200 border border-gray-300"
+                  style={{
+                    top: `${startIndex * 28}px`,
+                    height: `${(endIndex - startIndex + 1) * 28}px`,
+                    width: "80px",
+                    transform: "translateX(80px)",
+                    clipPath: "polygon(0% 0%, 0% 100%, 100% 80%, 100% 20%)",
+                  }}
+                />
+              </>
+            )
+          })()}
 
           {/* Seat rows - using actual coordinate mapping from API */}
           {xCoords.map((xCoord) => {
