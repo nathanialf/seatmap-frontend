@@ -176,7 +176,25 @@ export default function SearchPage() {
             } : 'no flight'
           });
           
+          // Debug: Raw backend flight data (HIDDEN)
+          // console.log('=== RAW BACKEND FLIGHT DATA ===');
+          // console.log('Number of flights:', backendFlights.length);
+          // console.log('Sample flight keys:', backendFlights[0] ? Object.keys(backendFlights[0]) : 'no flights');
+          // console.log('Raw flight data (first flight):', backendFlights[0]);
+          // console.log('Does first flight have rawFlightOffer?', !!backendFlights[0]?.rawFlightOffer);
+          // console.log('rawFlightOffer type:', typeof backendFlights[0]?.rawFlightOffer);
+          // console.log('rawFlightOffer value:', backendFlights[0]?.rawFlightOffer);
+          
           const transformedFlights = transformFlightData(backendFlights, dictionaries)
+          
+          // Debug: Transformed flight data (HIDDEN)
+          // console.log('=== TRANSFORMED FLIGHT DATA ===');
+          // console.log('Number of transformed flights:', transformedFlights.length);
+          // console.log('Sample transformed flight keys:', transformedFlights[0] ? Object.keys(transformedFlights[0]) : 'no flights');
+          // console.log('Transformed flight data (first flight):', transformedFlights[0]);
+          // console.log('Does first transformed flight have rawFlightOffer?', !!transformedFlights[0]?.rawFlightOffer);
+          // console.log('Transformed rawFlightOffer type:', typeof transformedFlights[0]?.rawFlightOffer);
+          // console.log('Transformed rawFlightOffer value:', transformedFlights[0]?.rawFlightOffer);
         
         logger.log('Transformation result:', {
           inputLength: Array.isArray(data.data) ? data.data.length : 'not array',
@@ -576,8 +594,8 @@ export default function SearchPage() {
               seatmapAvailable={flight.seatmapAvailable}
             />
 
-            {/* Overall Seatmap Data JSON Display */}
-            {flight.seatmapData && (
+            {/* Overall Seatmap Data JSON Display (HIDDEN) */}
+            {/* {flight.seatmapData && (
               <Card className="p-4">
                 <div className="mb-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -595,7 +613,7 @@ export default function SearchPage() {
                   </pre>
                 </div>
               </Card>
-            )}
+            )} */}
 
             {!flight.seatmapData && (
               <Card className="p-4">

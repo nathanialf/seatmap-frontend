@@ -236,6 +236,40 @@ const FlightResultCard: React.FC<FlightResultCardProps> = ({
           })()}
         </div>
       </div>
+
+      {/* Debug: Raw Flight Offer Data (HIDDEN) */}
+      {/* <div className="mt-4 border-t border-gray-200 pt-4">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+          <span className="text-sm font-semibold text-purple-700">
+            Raw Flight Offer Debug Data
+          </span>
+        </div>
+        {flight.rawFlightOffer ? (
+          <div className="space-y-2">
+            <div className="text-xs text-purple-600">
+              ✅ Raw flight offer data present (type: {typeof flight.rawFlightOffer})
+              {typeof flight.rawFlightOffer === 'string' && ` - ${flight.rawFlightOffer.length} characters`}
+            </div>
+            <pre className="text-xs text-gray-600 bg-purple-50 rounded border p-3 max-h-40 overflow-y-auto whitespace-pre-wrap">
+              {typeof flight.rawFlightOffer === 'string' 
+                ? (() => {
+                    try {
+                      return JSON.stringify(JSON.parse(flight.rawFlightOffer), null, 2)
+                    } catch (e) {
+                      return `Invalid JSON: ${flight.rawFlightOffer}`
+                    }
+                  })()
+                : JSON.stringify(flight.rawFlightOffer, null, 2)
+              }
+            </pre>
+          </div>
+        ) : (
+          <div className="text-xs text-red-600 bg-red-50 rounded border p-3">
+            ❌ No raw flight offer data - this flight will fail to bookmark
+          </div>
+        )}
+      </div> */}
     </Card>
   )
 }

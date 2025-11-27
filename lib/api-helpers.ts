@@ -64,7 +64,7 @@ export function prepareFlightSearchPayload(params: FlightSearchParams): FlightOf
     destination,
     departureDate,
     maxResults: 10, // Set to 10 as requested
-    includeRawFlightOffer: false, // Don't need raw data for frontend
+    includeRawFlightOffer: true, // Include raw flight offer data for bookmarks
   }
 
   // Handle optional airline and flight number fields
@@ -170,6 +170,7 @@ export interface Flight {
   seatmapAvailable?: boolean
   seatmapData?: Record<string, unknown> | null
   segments?: FlightSegment[]
+  rawFlightOffer?: string
 }
 
 /**

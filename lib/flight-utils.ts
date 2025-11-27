@@ -135,73 +135,41 @@ export function transformFlightData(
         // For multi-segment flights, seatmap availability is at flight level
         seatMapAvailable: flight.seatMapAvailable || false,
         seatMapData: flight.seatMap || null
-      }))
+      })),
+      // Capture raw flight offer data as string for bookmarks
+      rawFlightOffer: flight.rawFlightOffer ? JSON.stringify(flight.rawFlightOffer) : undefined
     };
   })
 }
 
 // Create flight offer data structure for bookmarking
 export function createFlightOfferData(flight: Flight): Record<string, unknown> {
-  // Extract carrier code and flight number from flightNumber (e.g., "UA 1679")
-  const flightNumberMatch = flight.flightNumber.match(/^(\w+)\s+(\d+)$/)
-  const carrierCode = flightNumberMatch?.[1] || 'XX'
-  const number = flightNumberMatch?.[2] || '0000'
-
-  // Parse flight date and times to create ISO strings
-  let departureAt = "2025-01-01T00:00:00.000Z"
-  let arrivalAt = "2025-01-01T00:00:00.000Z"
-  
-  try {
-    const dateStr = flight.date.replace(/^\w+,\s*/, '') // Remove day of week: "Dec 15, 2025"
-    const departureDateTime = new Date(`${dateStr} ${flight.departure.time}`)
-    const arrivalDateTime = new Date(`${dateStr} ${flight.arrival.time}`)
-    
-    if (!isNaN(departureDateTime.getTime())) {
-      departureAt = departureDateTime.toISOString()
-    }
-    if (!isNaN(arrivalDateTime.getTime())) {
-      arrivalAt = arrivalDateTime.toISOString()
-    }
-  } catch (parseError) {
-    logger.warn('Failed to parse flight date/time:', parseError)
+  // Require raw flight offer data - NO synthetic fallbacks
+  if (!flight.rawFlightOffer) {
+    logger.error('Cannot create bookmark: missing rawFlightOffer data', {
+      flightId: flight.id,
+      flightNumber: flight.flightNumber,
+      availableFields: Object.keys(flight)
+    })
+    throw new Error('Raw flight offer data is required for bookmarks. No synthetic data allowed.')
   }
 
-  return {
-    type: "flight-offer",
-    dataSource: "FRONTEND_SEARCH",
-    source: "SEARCH_RESULTS",
-    instantTicketingRequired: false,
-    nonHomogeneous: false,
-    oneWay: false,
-    numberOfBookableSeats: flight.availableSeats,
-    itineraries: [
-      {
-        duration: flight.duration,
-        segments: [
-          {
-            departure: {
-              iataCode: flight.departure.code,
-              at: departureAt
-            },
-            arrival: {
-              iataCode: flight.arrival.code,
-              at: arrivalAt
-            },
-            carrierCode: carrierCode,
-            number: number,
-            duration: flight.duration,
-            id: "1",
-            numberOfStops: 0,
-            blacklistedInEU: false
-          }
-        ]
-      }
-    ],
-    price: {
-      currency: "USD",
-      total: flight.price.replace('$', ''),
-      base: flight.price.replace('$', '')
-    }
+  try {
+    const rawData = JSON.parse(flight.rawFlightOffer)
+    logger.log('Using raw flight offer data for bookmark:', { 
+      hasRawData: true, 
+      dataKeys: Object.keys(rawData),
+      dataSource: rawData.dataSource,
+      source: rawData.source 
+    })
+    return rawData
+  } catch (parseError) {
+    logger.error('Failed to parse raw flight offer data:', {
+      parseError: parseError,
+      rawDataLength: flight.rawFlightOffer?.length,
+      rawDataPreview: flight.rawFlightOffer?.substring(0, 100)
+    })
+    throw new Error('Invalid raw flight offer data - failed to parse JSON')
   }
 }
 

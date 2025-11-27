@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { SeatmapRenderer } from "@/components/seatmap-renderer"
 
 // Types for bookmark data
 
@@ -35,6 +36,11 @@ export default function DashboardPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [bookmarkToDelete, setBookmarkToDelete] = useState<BookmarkItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [seatMapData, setSeatMapData] = useState<Record<string, unknown> | null>(null)
+  const [seatMapLoading, setSeatMapLoading] = useState(false)
+  const [seatMapError, setSeatMapError] = useState<string | null>(null)
+  const [showSeatMapModal, setShowSeatMapModal] = useState(false)
+  const [loadingBookmarkId, setLoadingBookmarkId] = useState<string | null>(null)
   const router = useRouter()
   const { isAuthenticated, isUser, isGuest, isLoading, hasFreeTier } = useAuth()
 
@@ -77,6 +83,82 @@ export default function DashboardPage() {
     // Navigate to search page with parameters using Next.js router
     router.push(`/search?${searchParams.toString()}`)
   }, [router])
+
+  // Function to view seat map for a flight bookmark
+  const handleViewSeatMap = useCallback(async (bookmark: BookmarkItem) => {
+    if (bookmark.itemType !== 'BOOKMARK') {
+      return
+    }
+
+    console.log('handleViewSeatMap called with bookmark:', {
+      bookmarkId: bookmark.bookmarkId,
+      bookmarkIdType: typeof bookmark.bookmarkId,
+      bookmarkTitle: bookmark.title,
+      bookmarkKeys: Object.keys(bookmark),
+      fullBookmark: bookmark
+    });
+
+    if (!bookmark.bookmarkId) {
+      setSeatMapError('Invalid bookmark: missing bookmark ID')
+      console.error('Bookmark missing bookmarkId:', bookmark)
+      return
+    }
+
+    setLoadingBookmarkId(bookmark.bookmarkId)
+    setSeatMapLoading(true)
+    setSeatMapError(null)
+    
+    try {
+      const url = `/api/flight-search/bookmark/${bookmark.bookmarkId}`
+      console.log('Making API call to:', url)
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      
+      let result;
+      try {
+        result = await response.json()
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError)
+        setSeatMapError(`Failed to parse response (${response.status}): ${response.statusText}`)
+        return
+      }
+      
+      console.log('Flight-search bookmark API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        success: result?.success,
+        hasData: !!result?.data,
+        dataKeys: result?.data ? Object.keys(result.data) : 'no data',
+        fullResult: result,
+        resultType: typeof result,
+        isEmptyObject: Object.keys(result || {}).length === 0
+      })
+      
+      if (result?.success) {
+        setSeatMapData(result.data)
+        setShowSeatMapModal(true)
+        console.log('Opening seat map modal with data:', result.data)
+      } else {
+        const errorMsg = result?.message || `API call failed (${response.status}): ${response.statusText}`
+        setSeatMapError(errorMsg)
+        console.error('API call failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          result: result,
+          isEmpty: Object.keys(result || {}).length === 0
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch seat map:', error)
+      setSeatMapError('Failed to load seat map')
+    } finally {
+      setSeatMapLoading(false)
+      setLoadingBookmarkId(null)
+    }
+  }, [])
 
   // Function to fetch bookmarks from API
   const fetchBookmarks = useCallback(async () => {
@@ -428,13 +510,32 @@ export default function DashboardPage() {
                       return dateA.getTime() - dateB.getTime()
                     })
                     .map((bookmark) => (
-                      <SavedItemCard
-                        key={bookmark.bookmarkId}
-                        bookmark={bookmark}
-                        onRunSearch={handleRunSearch}
-                        onDeleteClick={handleDeleteClick}
-                        parseFlightOffer={parseFlightOffer}
-                      />
+                      <div key={bookmark.bookmarkId}>
+                        <SavedItemCard
+                          bookmark={bookmark}
+                          onRunSearch={handleRunSearch}
+                          onDeleteClick={handleDeleteClick}
+                          onViewSeatMap={handleViewSeatMap}
+                          seatMapLoading={loadingBookmarkId === bookmark.bookmarkId}
+                          parseFlightOffer={parseFlightOffer}
+                        />
+                        {/* Debug readout for flight bookmarks (HIDDEN) */}
+                        {/* {bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData && (
+                          <Card className="mt-4 p-4 bg-gray-50 border border-gray-200">
+                            <div className="mb-2">
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-sm font-semibold text-gray-700">
+                                  Flight Bookmark Debug Data
+                                </span>
+                              </div>
+                              <pre className="text-xs text-gray-600 overflow-x-auto bg-white rounded border p-3 max-h-60 overflow-y-auto whitespace-pre-wrap">
+                                {JSON.stringify(JSON.parse(bookmark.flightOfferData), null, 2)}
+                              </pre>
+                            </div>
+                          </Card>
+                        )} */}
+                      </div>
                     ))
                 ) : hasFreeTier ? (
                   /* Free tier user - upgrade message */
@@ -522,6 +623,145 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Seat Map Modal */}
+        <Dialog open={showSeatMapModal} onOpenChange={setShowSeatMapModal}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Plane className="w-5 h-5 text-blue-600" />
+                Flight Seat Map
+              </DialogTitle>
+              <DialogDescription>
+                View seat availability and layout for your bookmarked flight.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {seatMapLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400 mr-3" />
+                <span>Loading seat map...</span>
+              </div>
+            ) : seatMapError ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-red-600 mb-2">Error Loading Seat Map</h3>
+                    <p className="text-gray-600 mb-4">{seatMapError}</p>
+                  </div>
+                </div>
+                
+                {/* Troubleshooting section */}
+                <Card className="p-4 bg-red-50 border border-red-200">
+                  <div className="text-sm">
+                    <div className="font-semibold text-red-700 mb-2">Troubleshooting:</div>
+                    <ul className="text-red-600 space-y-1 text-xs">
+                      <li>• Check if the backend API endpoint `/flight-search/bookmark/[id]` exists</li>
+                      <li>• Verify authentication tokens are valid</li>
+                      <li>• Check if the bookmark ID format is correct</li>
+                      <li>• Look at browser network tab for detailed error response</li>
+                    </ul>
+                  </div>
+                </Card>
+              </div>
+            ) : seatMapData ? (
+              <div className="space-y-4">
+                {/* Success Indicator (HIDDEN) */}
+                {/* <Card className="p-4 bg-green-50 border border-green-200">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-sm font-semibold text-green-700">
+                      Seat map data received successfully!
+                    </span>
+                  </div>
+                </Card> */}
+
+                {/* Debug Data - Show prominently to see what we got (HIDDEN) */}
+                {/* <Card className="p-4 bg-blue-50 border border-blue-200">
+                  <div className="mb-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm font-semibold text-blue-700">
+                        Raw API Response Structure
+                      </span>
+                    </div>
+                    <div className="text-xs text-blue-600 mb-2">
+                      Response keys: {Object.keys(seatMapData).join(', ')}
+                    </div>
+                    <pre className="text-xs text-gray-600 overflow-x-auto bg-white rounded border p-3 max-h-60 overflow-y-auto whitespace-pre-wrap">
+                      {JSON.stringify(seatMapData, null, 2)}
+                    </pre>
+                  </div>
+                </Card> */}
+
+                {/* Flight Info - Try to extract from any possible structure */}
+                {(seatMapData.flightInfo || seatMapData.data?.flightInfo || seatMapData.flight) && (
+                  <Card className="p-4">
+                    <div className="flex flex-wrap items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Plane className="w-4 h-4 text-gray-400" />
+                        <span className="font-semibold">
+                          {seatMapData.flightInfo?.flightNumber || 
+                           seatMapData.data?.flightInfo?.flightNumber || 
+                           seatMapData.flight?.flightNumber || 'Flight data'}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+                
+                {/* Try to render seat map from various possible locations */}
+                {(() => {
+                  const seatMapSources = [
+                    seatMapData.seatMap,
+                    seatMapData.data?.seatMap, 
+                    seatMapData.seatmap,
+                    seatMapData.data?.seatmap,
+                    seatMapData
+                  ].filter(Boolean);
+                  
+                  const seatMapSource = seatMapSources[0];
+                  
+                  if (seatMapSource) {
+                    try {
+                      return (
+                        <div>
+                          {/* <Card className="p-4 bg-green-50 border border-green-200 mb-4">
+                            <div className="text-sm text-green-700">
+                              Found seat map data! Attempting to render...
+                            </div>
+                          </Card> */}
+                          <SeatmapRenderer seatmapData={seatMapSource} />
+                        </div>
+                      );
+                    } catch (error) {
+                      return (
+                        <Card className="p-4 bg-yellow-50 border border-yellow-200">
+                          <div className="text-sm text-yellow-700">
+                            Found seat map data but failed to render: {error instanceof Error ? error.message : 'Unknown error'}
+                          </div>
+                        </Card>
+                      );
+                    }
+                  } else {
+                    return (
+                      <Card className="p-4 bg-yellow-50 border border-yellow-200">
+                        <div className="text-sm text-yellow-700">
+                          No seat map data found in expected locations. Check the raw response above to see the actual structure.
+                        </div>
+                      </Card>
+                    );
+                  }
+                })()}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No seat map data available</p>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>

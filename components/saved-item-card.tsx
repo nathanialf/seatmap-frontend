@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { Plane, Search, Bell, Trash2 } from 'lucide-react'
+import { Plane, Search, Bell, Trash2, Loader2 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import logger from "@/lib/logger"
@@ -79,6 +79,8 @@ interface SavedItemCardProps {
   bookmark: BookmarkItem
   onRunSearch: (bookmark: BookmarkItem) => void
   onDeleteClick: (bookmark: BookmarkItem) => void
+  onViewSeatMap?: (bookmark: BookmarkItem) => void
+  seatMapLoading?: boolean
   parseFlightOffer: (flightOfferData: string) => { route: string; date: string; price?: string; flightNumber: string } | null
 }
 
@@ -86,6 +88,8 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
   bookmark,
   onRunSearch,
   onDeleteClick,
+  onViewSeatMap,
+  seatMapLoading = false,
   parseFlightOffer
 }) => {
   return (
@@ -157,11 +161,22 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
               </Button>
             ) : (
               <Button 
-                disabled
-                variant="outline" 
-                className="rounded-full bg-transparent text-sm opacity-50 cursor-not-allowed"
+                disabled={!onViewSeatMap || seatMapLoading}
+                className={`rounded-full text-sm ${
+                  onViewSeatMap && !seatMapLoading
+                    ? 'bg-black text-white hover:bg-gray-800 cursor-pointer' 
+                    : 'bg-gray-400 text-white cursor-not-allowed'
+                }`}
+                onClick={() => onViewSeatMap && !seatMapLoading && onViewSeatMap(bookmark)}
               >
-                View Seats
+                {seatMapLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'View Seats'
+                )}
               </Button>
             )}
             <Button 
