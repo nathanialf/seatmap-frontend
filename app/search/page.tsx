@@ -779,8 +779,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Loading State - Only show for initial search, not when loading more */}
-        {isLoading && !hasLoadedInitial && (
+        {/* Loading State - Show until we have results OR all pages are searched */}
+        {(flights.length === 0 && (isLoading || (hasLoadedInitial && hasMorePages))) && (
           <div className="flex flex-col items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-4" />
             <p className="text-gray-600">Searching for flights...</p>
@@ -789,7 +789,7 @@ export default function SearchPage() {
         )}
 
         {/* Error State */}
-        {error && !isLoading && (
+        {error && !isLoading && !isLoadingMore && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
@@ -818,8 +818,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Results Count - Show when we have initial results or when not loading initially */}
-        {(hasLoadedInitial || (!isLoading && !error)) && (
+        {/* Results Count - Show when we have results */}
+        {(hasLoadedInitial && flights.length > 0) && (
           <div className="mb-6">
             <div className="text-sm text-gray-600 flex items-center gap-2">
               {flights.length === 0 ? (
@@ -834,7 +834,7 @@ export default function SearchPage() {
                   {hasMorePages && !isLoadingMore && (
                     <span className="flex items-center text-blue-600 bg-blue-50 px-2 py-1 rounded-full text-xs font-medium">
                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse inline-block"></span>
-                      Searching more pages...
+                      Searching for more flights...
                     </span>
                   )}
                 </>
@@ -850,7 +850,7 @@ export default function SearchPage() {
                   {hasMorePages && !isLoadingMore && (
                     <span className="flex items-center text-blue-600 bg-blue-50 px-2 py-1 rounded-full text-xs font-medium">
                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse inline-block"></span>
-                      Searching more pages...
+                      Searching for more flights...
                     </span>
                   )}
                   {!hasMorePages && !isLoadingMore && flights.length > 0 && (
@@ -862,8 +862,8 @@ export default function SearchPage() {
           </div>
         )}
 
-        {/* Flight Results - Show when we have initial results or when not loading initially */}
-        {(hasLoadedInitial || (!isLoading && !error)) && (
+        {/* Flight Results - Show when we have results or no results and done searching all pages */}
+        {((hasLoadedInitial && flights.length > 0) || (hasLoadedInitial && flights.length === 0 && !hasMorePages && !isLoading && !isLoadingMore && !error)) && (
           <div className="space-y-4">
             {flights.length === 0 ? (
               <div className="text-center py-12">
