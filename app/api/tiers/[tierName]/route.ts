@@ -30,8 +30,6 @@ export async function GET(
       )
     }
 
-    console.log('Fetching tier info for:', tierName)
-
     // Make request to backend API (publicly accessible endpoint)
     const response = await fetch(`${config.apiBaseUrl}/tiers/${tierName}`, {
       method: 'GET',
@@ -42,13 +40,6 @@ export async function GET(
     })
 
     const data = await response.json()
-
-    console.log('Backend tier response:', {
-      status: response.status,
-      success: data.success,
-      hasData: !!data.data,
-      responseKeys: Object.keys(data),
-    })
 
     if (!response.ok) {
       console.error('Backend tier error:', {

@@ -15,7 +15,6 @@ export async function GET(_request: NextRequest) {
     // Create config from environment variables
     const config = createConfig();
     
-    console.log('Fetching all tiers information')
 
     // Make request to backend API (publicly accessible endpoint)
     const response = await fetch(`${config.apiBaseUrl}/tiers`, {
@@ -28,12 +27,6 @@ export async function GET(_request: NextRequest) {
 
     const data = await response.json()
 
-    console.log('Backend tiers response:', {
-      status: response.status,
-      success: data.success,
-      hasData: !!data.data,
-      responseKeys: Object.keys(data),
-    })
 
     if (!response.ok) {
       console.error('Backend tiers error:', {

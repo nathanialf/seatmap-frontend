@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Bell, Plane, MapPin, Calendar, Bookmark, Search, Trash2, AlertTriangle, Loader2 } from "lucide-react"
+import { Bell, Plane, MapPin, Calendar, Bookmark, Search, Trash2, AlertTriangle, Loader2, Clock, Users, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
 import { useAuth } from "@/hooks/useAuth"
@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { SeatmapRenderer } from "@/components/seatmap-renderer"
+import { FlightSegmentDisplay } from "@/components/flight-segment-display"
 
 // Types for bookmark data
 
@@ -36,10 +37,7 @@ export default function DashboardPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [bookmarkToDelete, setBookmarkToDelete] = useState<BookmarkItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [seatMapData, setSeatMapData] = useState<Record<string, unknown> | null>(null)
-  const [seatMapLoading, setSeatMapLoading] = useState(false)
-  const [seatMapError, setSeatMapError] = useState<string | null>(null)
-  const [showSeatMapModal, setShowSeatMapModal] = useState(false)
+  const [selectedBookmarkForSeatMap, setSelectedBookmarkForSeatMap] = useState<BookmarkItem | null>(null)
   const [loadingBookmarkId, setLoadingBookmarkId] = useState<string | null>(null)
   const router = useRouter()
   const { isAuthenticated, isUser, isGuest, isLoading, hasFreeTier } = useAuth()
@@ -90,72 +88,71 @@ export default function DashboardPage() {
       return
     }
 
-    console.log('handleViewSeatMap called with bookmark:', {
-      bookmarkId: bookmark.bookmarkId,
-      bookmarkIdType: typeof bookmark.bookmarkId,
-      bookmarkTitle: bookmark.title,
-      bookmarkKeys: Object.keys(bookmark),
-      fullBookmark: bookmark
-    });
-
-    if (!bookmark.bookmarkId) {
-      setSeatMapError('Invalid bookmark: missing bookmark ID')
-      console.error('Bookmark missing bookmarkId:', bookmark)
-      return
-    }
-
+    // Set loading state
     setLoadingBookmarkId(bookmark.bookmarkId)
-    setSeatMapLoading(true)
-    setSeatMapError(null)
-    
+
     try {
-      const url = `/api/flight-search/bookmark/${bookmark.bookmarkId}`
-      console.log('Making API call to:', url)
-      
-      const response = await fetch(url, {
+      // Parse the flight offer data that's already in memory
+      const flightOfferData = JSON.parse(bookmark.flightOfferData)
+      // Call the seat map API to get seat map data for this flight
+      const response = await fetch(`/api/flight-search/bookmark/${bookmark.bookmarkId}`, {
         method: 'GET',
         credentials: 'include',
       })
       
-      let result;
-      try {
-        result = await response.json()
-      } catch (jsonError) {
-        console.error('Failed to parse JSON response:', jsonError)
-        setSeatMapError(`Failed to parse response (${response.status}): ${response.statusText}`)
-        return
-      }
+      const result = await response.json()
       
-      console.log('Flight-search bookmark API response:', {
-        status: response.status,
-        statusText: response.statusText,
-        success: result?.success,
-        hasData: !!result?.data,
-        dataKeys: result?.data ? Object.keys(result.data) : 'no data',
-        fullResult: result,
-        resultType: typeof result,
-        isEmptyObject: Object.keys(result || {}).length === 0
-      })
-      
-      if (result?.success) {
-        setSeatMapData(result.data)
-        setShowSeatMapModal(true)
-        console.log('Opening seat map modal with data:', result.data)
+      if (result.success && result.data) {
+        // Extract actual flight number from flight offer data
+        const segments = flightOfferData.itineraries?.[0]?.segments || []
+        const firstSegment = segments[0] || {}
+        const flightNumber = `${firstSegment.carrierCode || ''} ${firstSegment.number || ''}`.trim()
+        
+        // Construct flight object like in search results
+        // The bookmark has flight offer data, API returns seat map data
+        
+        const flightWithSeatMap = {
+          ...flightOfferData,
+          seatmapData: result.data, // This should be the seat map with decks
+          flightNumber: flightNumber,
+          id: flightNumber || bookmark.bookmarkId,
+          // Add segments array for FlightSegmentDisplay component
+          segments: segments.map((segment, index) => ({
+            segmentIndex: index,
+            carrier: segment.carrierCode || '',
+            flightNumber: `${segment.carrierCode || ''} ${segment.number || ''}`.trim(),
+            route: `${segment.departure?.iataCode || ''} → ${segment.arrival?.iataCode || ''}`,
+            departure: {
+              code: segment.departure?.iataCode || '',
+              time: segment.departure?.at ? new Date(segment.departure.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : ''
+            },
+            arrival: {
+              code: segment.arrival?.iataCode || '',
+              time: segment.arrival?.at ? new Date(segment.arrival.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : ''
+            },
+            aircraft: segment.aircraft?.code || undefined,
+            seatMapAvailable: !!result.data?.seatMap,
+            seatMapData: result.data?.seatMap
+          }))
+        }
+        
+        // Set state to show inline seat map viewer
+        setSelectedBookmarkForSeatMap(flightWithSeatMap)
       } else {
-        const errorMsg = result?.message || `API call failed (${response.status}): ${response.statusText}`
-        setSeatMapError(errorMsg)
-        console.error('API call failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          result: result,
-          isEmpty: Object.keys(result || {}).length === 0
-        })
+        console.error('Failed to get seat map data:', result.message)
       }
     } catch (error) {
-      console.error('Failed to fetch seat map:', error)
-      setSeatMapError('Failed to load seat map')
+      console.error('Failed to process flight bookmark:', error)
     } finally {
-      setSeatMapLoading(false)
+      // Clear loading state
       setLoadingBookmarkId(null)
     }
   }, [])
@@ -345,6 +342,118 @@ export default function DashboardPage() {
     )
   }
 
+  // Seat map viewer for bookmarked flights (inline like search results)
+  if (selectedBookmarkForSeatMap !== null) {
+    const flight = selectedBookmarkForSeatMap
+    if (!flight) return null
+
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-6">
+            <Button
+              onClick={() => setSelectedBookmarkForSeatMap(null)}
+              variant="outline"
+              className="rounded-full mb-4 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Seat Map Viewer</h1>
+            <p className="text-gray-600">
+              {flight.flightNumber || 'Flight'} • {flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode} → {flight.itineraries?.[0]?.segments?.[flight.itineraries[0].segments.length - 1]?.arrival?.iataCode}
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Plane className="w-4 h-4 text-gray-400" />
+                  <span className="font-semibold">{flight.flightNumber}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-gray-400" />
+                  <span>
+                    {flight.itineraries?.[0]?.segments?.[0]?.departure?.iataCode} → {flight.itineraries?.[0]?.segments?.[flight.itineraries[0].segments.length - 1]?.arrival?.iataCode}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span>{flight.itineraries?.[0]?.segments?.[0]?.departure?.at ? new Date(flight.itineraries[0].segments[0].departure.at).toLocaleDateString() : 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gray-400" />
+                  <span>
+                    {flight.itineraries?.[0]?.segments?.[0]?.departure?.at ? new Date(flight.itineraries[0].segments[0].departure.at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'} - {flight.itineraries?.[0]?.segments?.[flight.itineraries[0].segments.length - 1]?.arrival?.at ? new Date(flight.itineraries[0].segments[flight.itineraries[0].segments.length - 1].arrival.at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}
+                  </span>
+                </div>
+                {/* Only show total seat availability for single segment flights */}
+                {flight.itineraries?.[0]?.segments?.length === 1 && (
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-400" />
+                    <span className="text-teal-600 font-medium">
+                      {(() => {
+                        if (flight.seatmapData?.seatMap?.decks) {
+                          const allSeats = flight.seatmapData.seatMap.decks.flatMap(deck => deck.seats || []);
+                          const availableSeats = allSeats.filter(seat => seat.availabilityStatus === 'AVAILABLE');
+                          const totalSeats = allSeats.length;
+                          const percentage = totalSeats > 0 ? Math.round((availableSeats.length / totalSeats) * 100) : 0;
+                          return `${availableSeats.length} seats available (${percentage}% of ${totalSeats} total)`;
+                        }
+                        return `${flight.numberOfBookableSeats || 'N/A'} seats available`;
+                      })()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* Multi-segment flight details */}
+            <FlightSegmentDisplay
+              segments={flight.segments || []}
+              seatmapData={flight.seatmapData?.seatMap}
+              seatmapAvailable={!!flight.seatmapData?.seatMap}
+            />
+
+            {(() => {
+              
+              // The seat map API returns the full flight offer with seatMap property
+              if (flight.seatmapData?.seatMap?.decks && Array.isArray(flight.seatmapData.seatMap.decks)) {
+                return <SeatmapRenderer seatmapData={flight.seatmapData.seatMap} />;
+              } else {
+                return (
+                  <Card className="p-4 sm:p-6">
+                    <div className="text-center py-12">
+                      <Plane className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-700 mb-2">
+                        {flight.seatmapData ? 'Invalid Seat Map Data' : 'No Seat Map Available'}
+                      </h3>
+                      <p className="text-gray-500">
+                        {flight.seatmapData 
+                          ? 'The seat map data structure is not in the expected format.'
+                          : 'Seat map information is not available for this flight.'}
+                      </p>
+                      {flight.seatmapData && (
+                        <details className="mt-4 text-left">
+                          <summary className="cursor-pointer text-sm text-gray-400">Debug: Show seat map data structure</summary>
+                          <pre className="text-xs text-gray-600 mt-2 p-2 bg-gray-100 rounded overflow-auto max-h-40">
+                            {JSON.stringify(flight.seatmapData, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  </Card>
+                );
+              }
+            })()}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -520,7 +629,7 @@ export default function DashboardPage() {
                           parseFlightOffer={parseFlightOffer}
                         />
                         {/* Debug readout for flight bookmarks (HIDDEN) */}
-                        {/* {bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData && (
+                        {false && bookmark.itemType === 'BOOKMARK' && bookmark.flightOfferData && (
                           <Card className="mt-4 p-4 bg-gray-50 border border-gray-200">
                             <div className="mb-2">
                               <div className="flex items-center gap-2 mb-2">
@@ -534,7 +643,7 @@ export default function DashboardPage() {
                               </pre>
                             </div>
                           </Card>
-                        )} */}
+                        )}
                       </div>
                     ))
                 ) : hasFreeTier ? (
@@ -624,144 +733,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Seat Map Modal */}
-        <Dialog open={showSeatMapModal} onOpenChange={setShowSeatMapModal}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Plane className="w-5 h-5 text-blue-600" />
-                Flight Seat Map
-              </DialogTitle>
-              <DialogDescription>
-                View seat availability and layout for your bookmarked flight.
-              </DialogDescription>
-            </DialogHeader>
-            
-            {seatMapLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-400 mr-3" />
-                <span>Loading seat map...</span>
-              </div>
-            ) : seatMapError ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-red-600 mb-2">Error Loading Seat Map</h3>
-                    <p className="text-gray-600 mb-4">{seatMapError}</p>
-                  </div>
-                </div>
-                
-                {/* Troubleshooting section */}
-                <Card className="p-4 bg-red-50 border border-red-200">
-                  <div className="text-sm">
-                    <div className="font-semibold text-red-700 mb-2">Troubleshooting:</div>
-                    <ul className="text-red-600 space-y-1 text-xs">
-                      <li>• Check if the backend API endpoint `/flight-search/bookmark/[id]` exists</li>
-                      <li>• Verify authentication tokens are valid</li>
-                      <li>• Check if the bookmark ID format is correct</li>
-                      <li>• Look at browser network tab for detailed error response</li>
-                    </ul>
-                  </div>
-                </Card>
-              </div>
-            ) : seatMapData ? (
-              <div className="space-y-4">
-                {/* Success Indicator (HIDDEN) */}
-                {/* <Card className="p-4 bg-green-50 border border-green-200">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-sm font-semibold text-green-700">
-                      Seat map data received successfully!
-                    </span>
-                  </div>
-                </Card> */}
-
-                {/* Debug Data - Show prominently to see what we got (HIDDEN) */}
-                {/* <Card className="p-4 bg-blue-50 border border-blue-200">
-                  <div className="mb-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-sm font-semibold text-blue-700">
-                        Raw API Response Structure
-                      </span>
-                    </div>
-                    <div className="text-xs text-blue-600 mb-2">
-                      Response keys: {Object.keys(seatMapData).join(', ')}
-                    </div>
-                    <pre className="text-xs text-gray-600 overflow-x-auto bg-white rounded border p-3 max-h-60 overflow-y-auto whitespace-pre-wrap">
-                      {JSON.stringify(seatMapData, null, 2)}
-                    </pre>
-                  </div>
-                </Card> */}
-
-                {/* Flight Info - Try to extract from any possible structure */}
-                {(seatMapData.flightInfo || seatMapData.data?.flightInfo || seatMapData.flight) && (
-                  <Card className="p-4">
-                    <div className="flex flex-wrap items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Plane className="w-4 h-4 text-gray-400" />
-                        <span className="font-semibold">
-                          {seatMapData.flightInfo?.flightNumber || 
-                           seatMapData.data?.flightInfo?.flightNumber || 
-                           seatMapData.flight?.flightNumber || 'Flight data'}
-                        </span>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-                
-                {/* Try to render seat map from various possible locations */}
-                {(() => {
-                  const seatMapSources = [
-                    seatMapData.seatMap,
-                    seatMapData.data?.seatMap, 
-                    seatMapData.seatmap,
-                    seatMapData.data?.seatmap,
-                    seatMapData
-                  ].filter(Boolean);
-                  
-                  const seatMapSource = seatMapSources[0];
-                  
-                  if (seatMapSource) {
-                    try {
-                      return (
-                        <div>
-                          {/* <Card className="p-4 bg-green-50 border border-green-200 mb-4">
-                            <div className="text-sm text-green-700">
-                              Found seat map data! Attempting to render...
-                            </div>
-                          </Card> */}
-                          <SeatmapRenderer seatmapData={seatMapSource} />
-                        </div>
-                      );
-                    } catch (error) {
-                      return (
-                        <Card className="p-4 bg-yellow-50 border border-yellow-200">
-                          <div className="text-sm text-yellow-700">
-                            Found seat map data but failed to render: {error instanceof Error ? error.message : 'Unknown error'}
-                          </div>
-                        </Card>
-                      );
-                    }
-                  } else {
-                    return (
-                      <Card className="p-4 bg-yellow-50 border border-yellow-200">
-                        <div className="text-sm text-yellow-700">
-                          No seat map data found in expected locations. Check the raw response above to see the actual structure.
-                        </div>
-                      </Card>
-                    );
-                  }
-                })()}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500">No seat map data available</p>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
 
         {/* Delete Confirmation Modal */}
       <Dialog open={deleteModalOpen} onOpenChange={setDeleteModalOpen}>

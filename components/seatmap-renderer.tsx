@@ -186,7 +186,7 @@ const DeckSeatmap: React.FC<{
         </p>
       </div>
 
-      <div className="relative text-center">
+      <div className="relative text-center" data-seatmap-container>
         {/* Aircraft nose */}
         <div className="flex justify-center mb-1">
           <div className="w-16 h-8 bg-gray-100 rounded-t-full border-2 border-gray-300"></div>

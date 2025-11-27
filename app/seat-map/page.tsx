@@ -1,239 +1,302 @@
 "use client"
 
+import { useEffect, useState, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
-import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Plane, Bell, Check } from "lucide-react"
-import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Plane, ArrowLeft, Loader2, AlertTriangle, MapPin, Calendar, Clock, Users } from "lucide-react"
+import { SeatmapRenderer } from "@/components/seatmap-renderer"
+import Link from "next/link"
 
-export default function SeatMapPage() {
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null)
+function SeatMapContent() {
+  const searchParams = useSearchParams()
+  const bookmarkId = searchParams?.get('bookmarkId')
+  
+  const [seatMapData, setSeatMapData] = useState<Record<string, unknown> | null>(null)
+  const [bookmarkData, setBookmarkData] = useState<Record<string, unknown> | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Generate seat layout (6 seats per row, rows 1-20)
-  const rows = 20
-  const seatsPerRow = ["A", "B", "C", "D", "E", "F"]
-
-  // Mock occupied seats
-  const occupiedSeats = new Set([
-    "1A",
-    "1B",
-    "2C",
-    "3D",
-    "4A",
-    "5F",
-    "6B",
-    "7C",
-    "8E",
-    "9A",
-    "10D",
-    "12A",
-    "12F",
-    "15C",
-    "16B",
-  ])
-
-  const getSeatStatus = (seat: string) => {
-    if (occupiedSeats.has(seat)) return "occupied"
-    if (selectedSeat === seat) return "selected"
-    return "available"
-  }
-
-  const getSeatColor = (status: string) => {
-    switch (status) {
-      case "occupied":
-        return "bg-gray-300 cursor-not-allowed"
-      case "selected":
-        return "bg-teal-500 text-white"
-      default:
-        return "bg-white border-2 border-gray-300 hover:border-teal-500 cursor-pointer"
+  useEffect(() => {
+    if (!bookmarkId) {
+      setError('No bookmark ID provided')
+      setLoading(false)
+      return
     }
-  }
 
-  return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
+    const fetchSeatMapData = async () => {
+      try {
+        const response = await fetch(`/api/flight-search/bookmark/${bookmarkId}`, {
+          method: 'GET',
+          credentials: 'include',
+        })
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8">
-        {/* Flight Info Header */}
-        <Card className="p-4 md:p-6 mb-6 md:mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Plane className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="text-sm md:text-base font-semibold">American Airlines AA 1234</span>
-              </div>
-              <p className="text-xs md:text-sm text-gray-600">LAX → JFK • Dec 15, 2024 • 08:00 AM</p>
-            </div>
-            <div className="text-right">
-              <div className="text-xl md:text-2xl font-bold">$450</div>
-              <div className="text-xs md:text-sm text-gray-500">Base fare</div>
-            </div>
-          </div>
-        </Card>
+        const result = await response.json()
 
-        <div className="grid lg:grid-cols-3 gap-6 md:gap-8">
-          {/* Seat Map */}
-          <div className="lg:col-span-2">
-            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Select Your Seat</h2>
+        if (result.success) {
+          setSeatMapData(result.data)
+          
+          // Also fetch the bookmark data for flight info
+          const bookmarkResponse = await fetch(`/api/bookmarks/${bookmarkId}`, {
+            method: 'GET',
+            credentials: 'include',
+          })
+          const bookmarkResult = await bookmarkResponse.json()
+          if (bookmarkResult.success) {
+            setBookmarkData(bookmarkResult.data)
+          }
+        } else {
+          setError(result.message || 'Failed to load seat map')
+        }
+      } catch (err) {
+        console.error('Failed to fetch seat map:', err)
+        setError('Failed to load seat map')
+      } finally {
+        setLoading(false)
+      }
+    }
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-3 md:gap-6 mb-4 md:mb-6 text-xs md:text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 md:w-6 md:h-6 bg-white border-2 border-gray-300 rounded"></div>
-                <span>Available</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 md:w-6 md:h-6 bg-gray-300 rounded"></div>
-                <span>Occupied</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 md:w-6 md:h-6 bg-teal-500 rounded"></div>
-                <span>Selected</span>
-              </div>
-            </div>
+    fetchSeatMapData()
+  }, [bookmarkId])
 
-            <div className="bg-gray-50 rounded-xl md:rounded-2xl p-2 md:p-8 flex justify-center touch-none select-none">
-              <div className="w-full max-w-[280px] sm:max-w-sm md:max-w-none">
-                {/* Cockpit indicator */}
-                <div className="flex justify-center mb-3 md:mb-6">
-                  <div className="w-20 h-5 md:w-32 md:h-8 bg-gray-300 rounded-t-full flex items-center justify-center text-[10px] md:text-xs text-gray-600">
-                    Cockpit
-                  </div>
-                </div>
-
-                {/* Column labels */}
-                <div className="flex justify-center mb-1 md:mb-2">
-                  <div className="flex gap-0.5 sm:gap-1 md:gap-2">
-                    {seatsPerRow.slice(0, 3).map((letter) => (
-                      <div
-                        key={letter}
-                        className="w-6 sm:w-7 md:w-10 text-center text-[10px] sm:text-xs md:text-sm text-gray-500 font-medium"
-                      >
-                        {letter}
-                      </div>
-                    ))}
-                    <div className="w-3 sm:w-4 md:w-8"></div>
-                    {seatsPerRow.slice(3).map((letter) => (
-                      <div
-                        key={letter}
-                        className="w-6 sm:w-7 md:w-10 text-center text-[10px] sm:text-xs md:text-sm text-gray-500 font-medium"
-                      >
-                        {letter}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Seats */}
-                <div className="space-y-0.5 sm:space-y-1 md:space-y-2">
-                  {Array.from({ length: rows }, (_, i) => i + 1).map((row) => (
-                    <div key={row} className="flex items-center justify-center gap-0.5 sm:gap-1 md:gap-2">
-                      {/* Row number - left */}
-                      <div className="w-4 sm:w-5 md:w-8 text-center text-[10px] sm:text-xs md:text-sm text-gray-500 font-medium">
-                        {row}
-                      </div>
-
-                      {/* Left side seats (A, B, C) */}
-                      {seatsPerRow.slice(0, 3).map((letter) => {
-                        const seatId = `${row}${letter}`
-                        const status = getSeatStatus(seatId)
-                        return (
-                          <button
-                            key={seatId}
-                            onClick={() => status === "available" && setSelectedSeat(seatId)}
-                            disabled={status === "occupied"}
-                            className={`w-6 h-6 sm:w-7 sm:h-7 md:w-10 md:h-10 rounded text-[10px] sm:text-xs font-medium transition-colors ${getSeatColor(status)}`}
-                          >
-                            {status === "selected" && (
-                              <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 mx-auto" />
-                            )}
-                          </button>
-                        )
-                      })}
-
-                      {/* Aisle */}
-                      <div className="w-3 sm:w-4 md:w-8"></div>
-
-                      {/* Right side seats (D, E, F) */}
-                      {seatsPerRow.slice(3).map((letter) => {
-                        const seatId = `${row}${letter}`
-                        const status = getSeatStatus(seatId)
-                        return (
-                          <button
-                            key={seatId}
-                            onClick={() => status === "available" && setSelectedSeat(seatId)}
-                            disabled={status === "occupied"}
-                            className={`w-6 h-6 sm:w-7 sm:h-7 md:w-10 md:h-10 rounded text-[10px] sm:text-xs font-medium transition-colors ${getSeatColor(status)}`}
-                          >
-                            {status === "selected" && (
-                              <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 mx-auto" />
-                            )}
-                          </button>
-                        )
-                      })}
-
-                      {/* Row number - right */}
-                      <div className="w-4 sm:w-5 md:w-8 text-center text-[10px] sm:text-xs md:text-sm text-gray-500 font-medium">
-                        {row}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Booking Summary */}
-          <div className="lg:col-span-1">
-            <Card className="p-4 md:p-6 lg:sticky lg:top-8">
-              <h3 className="text-lg md:text-xl font-bold mb-4 md:mb-6">Booking Summary</h3>
-
-              <div className="space-y-3 md:space-y-4 mb-4 md:mb-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Base Fare</span>
-                  <span className="font-medium">$450</span>
-                </div>
-                {selectedSeat && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Seat {selectedSeat}</span>
-                    <span className="font-medium">$0</span>
-                  </div>
-                )}
-                <div className="border-t pt-3 md:pt-4 flex justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="text-xl md:text-2xl font-bold">$450</span>
-                </div>
-              </div>
-
-              {selectedSeat ? (
-                <div className="space-y-3">
-                  <Button className="w-full bg-black text-white hover:bg-gray-800 rounded-full cursor-pointer">
-                    Continue to Payment
-                  </Button>
-                  <Button variant="outline" className="w-full rounded-full bg-transparent cursor-pointer">
-                    <Bell className="w-4 h-4 mr-2" />
-                    Set Alert for This Seat
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-6 md:py-8 text-gray-500 text-sm">Select a seat to continue</div>
-              )}
-
-              {selectedSeat && (
-                <div className="mt-4 md:mt-6 p-3 md:p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Check className="w-4 h-4 md:w-5 md:h-5 text-green-500 mt-0.5" />
-                    <div className="text-sm">
-                      <p className="font-medium mb-1">Seat {selectedSeat} Selected</p>
-                      <p className="text-gray-600">Window seat with extra legroom</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400 mr-3" />
+            <span>Loading seat map...</span>
           </div>
         </div>
       </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-6">
+            <Link href="/dashboard">
+              <Button variant="outline" className="flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4" />
+                Back to Dashboard
+              </Button>
+            </Link>
+          </div>
+          <Card className="p-8 text-center">
+            <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-red-600 mb-2">Error Loading Seat Map</h3>
+            <p className="text-gray-600">{error}</p>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back button */}
+        <div className="mb-6">
+          <Link href="/dashboard">
+            <Button variant="outline" className="rounded-full mb-4 cursor-pointer">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        </div>
+
+        {/* Flight Information Header */}
+        {(() => {
+          if (!bookmarkData) {
+            return (
+              <div className="space-y-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Seat Map Viewer</h1>
+                <p className="text-gray-600">Loading flight information...</p>
+              </div>
+            );
+          }
+          try {
+            const flightData = JSON.parse(bookmarkData.flightOfferData);
+            const segments = flightData.itineraries?.[0]?.segments || [];
+            const firstSegment = segments[0] || {};
+            const lastSegment = segments[segments.length - 1] || {};
+            
+            const departureTime = firstSegment.departure?.at ? 
+              new Date(firstSegment.departure.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : 'N/A';
+              
+            const arrivalTime = lastSegment.arrival?.at ? 
+              new Date(lastSegment.arrival.at).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : 'N/A';
+              
+            const departureDate = firstSegment.departure?.at ? 
+              new Date(firstSegment.departure.at).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              }) : 'N/A';
+              
+            const departureCode = firstSegment.departure?.iataCode || 'N/A';
+            const arrivalCode = lastSegment.arrival?.iataCode || 'N/A';
+            const flightNumber = `${firstSegment.carrierCode || ''} ${firstSegment.number || ''}`.trim();
+            const carrierCode = firstSegment.carrierCode || 'Flight';
+            
+            // Calculate seat availability from seat map data if available
+            const calculateSeatAvailability = () => {
+              if (seatMapData?.data?.seatMap?.decks || seatMapData?.seatMap?.decks || seatMapData?.decks) {
+                const decks = seatMapData.data?.seatMap?.decks || seatMapData?.seatMap?.decks || seatMapData?.decks;
+                if (Array.isArray(decks)) {
+                  let total = 0;
+                  let available = 0;
+                  decks.forEach(deck => {
+                    if (deck.seats && Array.isArray(deck.seats)) {
+                      deck.seats.forEach(seat => {
+                        total++;
+                        if (seat.status === 'AVAILABLE') {
+                          available++;
+                        }
+                      });
+                    }
+                  });
+                  return {
+                    available,
+                    total,
+                    percentage: total > 0 ? Math.round((available / total) * 100) : 0
+                  };
+                }
+              }
+              return {
+                available: flightData.numberOfBookableSeats || 'N/A',
+                total: 'N/A',
+                percentage: 'N/A'
+              };
+            };
+
+            const seatAvailability = calculateSeatAvailability();
+
+            return (
+              <div className="space-y-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Seat Map Viewer</h1>
+                <p className="text-gray-600">
+                  {carrierCode} {flightNumber.split(' ')[1] || flightNumber} • {departureCode} → {arrivalCode}
+                </p>
+                
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Plane className="w-4 h-4 text-gray-400" />
+                      <span className="font-semibold">{flightNumber}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span>{departureCode} → {arrivalCode}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <span>{departureDate}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-gray-400" />
+                      <span>{departureTime} - {arrivalTime}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-gray-400" />
+                      <span className="text-teal-600 font-medium">
+                        {seatAvailability.total !== 'N/A' 
+                          ? `${seatAvailability.available} seats available (${seatAvailability.percentage}% of ${seatAvailability.total} total)`
+                          : `${seatAvailability.available} seats available`
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            );
+          } catch {
+            return (
+              <Card className="p-4 bg-yellow-50 border border-yellow-200 mb-6">
+                <div className="text-sm text-yellow-700">
+                  Unable to parse flight information from bookmark data.
+                </div>
+              </Card>
+            );
+          }
+        })()}
+
+        {/* Seat Map */}
+        {seatMapData && (() => {
+          const seatMapSources = [
+            seatMapData.seatMap,
+            seatMapData.data?.seatMap, 
+            seatMapData.seatmap,
+            seatMapData.data?.seatmap,
+            seatMapData
+          ].filter(Boolean);
+          
+          const seatMapSource = seatMapSources[0];
+          
+          if (seatMapSource) {
+            return <SeatmapRenderer seatmapData={seatMapSource} />;
+          } else {
+            return (
+              <Card className="p-8 text-center">
+                <AlertTriangle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-yellow-600 mb-2">No Seat Map Available</h3>
+                <p className="text-gray-600">Seat map data is not available for this flight.</p>
+              </Card>
+            );
+          }
+        })()}
+
+        {/* Debug Data */}
+        <Card className="mt-6 p-4 bg-blue-50 border border-blue-200">
+          <div className="mb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+              <span className="text-sm font-semibold text-blue-700">
+                Seat Map API Response Structure
+              </span>
+            </div>
+            <div className="text-xs text-blue-600 mb-2">
+              Response keys: {seatMapData ? Object.keys(seatMapData).join(', ') : 'no data'}
+            </div>
+            <pre className="text-xs text-gray-600 overflow-x-auto bg-white rounded border p-3 max-h-60 overflow-y-auto whitespace-pre-wrap">
+              {seatMapData ? JSON.stringify(seatMapData, null, 2) : 'No data'}
+            </pre>
+          </div>
+        </Card>
+      </div>
     </div>
+  )
+}
+
+export default function SeatMapPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400 mr-3" />
+            <span>Loading...</span>
+          </div>
+        </div>
+      </div>
+    }>
+      <SeatMapContent />
+    </Suspense>
   )
 }

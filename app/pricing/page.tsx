@@ -34,51 +34,26 @@ export default function PricingPage() {
 
         // Handle auth status
         const authData = await authResponse.json()
-        console.log('Auth response:', authData)
         if (authData.success) {
           const newAuthStatus = {
             isAuthenticated: authData.data.isAuthenticated,
             isUser: authData.data.isUser,
             userTier: authData.data.userTier
           }
-          console.log('Setting auth status:', newAuthStatus)
           setAuthStatus(newAuthStatus)
         }
 
         // Handle tiers data
         const tiersData = await tiersResponse.json()
-        console.log('Tiers response:', tiersData)
-        
         if (tiersData.success && tiersData.data) {
           // Extract tiers array from the response structure
           const rawTiers = tiersData.data.tiers || tiersData.data
           const tierArray = Array.isArray(rawTiers) ? rawTiers : [rawTiers]
-          console.log('All tiers from API:', tierArray)
-          console.log('Number of tiers received:', tierArray.length)
-          
-          // Log each tier in detail
-          tierArray.forEach((tier: TierInfo, index: number) => {
-            console.log(`Tier ${index + 1} RAW:`, tier)
-            console.log(`Tier ${index + 1} keys:`, Object.keys(tier))
-            console.log(`Tier ${index + 1} mapped:`, {
-              tierName: tier.tierName,
-              displayName: tier.displayName,
-              description: tier.description,
-              priceUsd: tier.priceUsd,
-              billingType: tier.billingType,
-              maxSeatmapCalls: tier.maxSeatmapCalls,
-              maxBookmarks: tier.maxBookmarks,
-              publiclyAccessible: tier.publiclyAccessible,
-              active: tier.active,
-              canDowngrade: tier.canDowngrade
-            })
-          })
           
           // Filter tiers - be more lenient with filtering
           const visibleTiers = tierArray.filter((tier: TierInfo) => {
             const isPublic = tier.publiclyAccessible !== false
             const isActive = tier.active !== false
-            console.log(`Tier ${tier.tierName}: public=${isPublic}, active=${isActive}, showing=${isPublic && isActive}`)
             return isPublic && isActive
           })
           
@@ -89,14 +64,7 @@ export default function PricingPage() {
             return priceA - priceB
           })
           
-          console.log('Visible tiers after filtering:', visibleTiers.length, 'tiers')
-          console.log('Sorted tiers by price:', sortedTiers.map(t => `${t.tierName}: $${t.priceUsd}`))
           setTiers(sortedTiers)
-          
-          // If we only got one tier or limited tiers, log a warning
-          if (visibleTiers.length <= 1) {
-            console.warn('Only', visibleTiers.length, 'visible tier(s) found. Expected multiple tiers (FREE, PRO, BUSINESS)')
-          }
         } else {
           console.error('Invalid tiers response:', tiersData)
           throw new Error('Failed to load pricing information')
@@ -118,11 +86,6 @@ export default function PricingPage() {
   }
 
   const getActionButton = (tier: TierInfo) => {
-    console.log(`Getting action button for ${tier.tierName}:`, {
-      isCurrentTier: isCurrentTier(tier.tierName),
-      authStatus,
-      tierName: tier.tierName
-    })
     
     if (isCurrentTier(tier.tierName)) {
       return { text: "Current Plan", disabled: true, variant: "secondary" as const }
@@ -233,11 +196,6 @@ export default function PricingPage() {
               const features = formatFeatures(tier)
               const isCurrentUserTier = isCurrentTier(tier.tierName)
               
-              console.log(`Card styling for ${tier.tierName}:`, {
-                isCurrentUserTier,
-                authStatus,
-                comparison: `${authStatus.userTier} === ${tier.tierName}`
-              })
               
               return (
                 <Card
@@ -273,7 +231,6 @@ export default function PricingPage() {
                     onClick={() => {
                       if (!actionButton.disabled) {
                         // TODO: Implement tier change functionality
-                        console.log(`Action: ${actionButton.text} to ${tier.tierName}`)
                       }
                     }}
                   >

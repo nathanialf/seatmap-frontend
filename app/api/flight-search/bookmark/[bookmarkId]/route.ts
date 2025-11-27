@@ -6,16 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
-// API Response types
-interface ApiResponse<T = unknown> {
-  success: boolean;
-  message?: string;
-  data: T;
-  meta?: {
-    errorCode?: string;
-    timestamp?: string;
-  };
-}
+// API Response types - removed unused interface
 
 /**
  * Get a valid auth token from cookies (user authentication required for bookmarks)

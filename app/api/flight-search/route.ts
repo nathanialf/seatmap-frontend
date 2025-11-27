@@ -43,19 +43,9 @@ async function getAuthToken(config: { apiBaseUrl: string; apiKey: string }): Pro
   const expiresAt = expiryCookie ? parseInt(expiryCookie.value) : 0;
   const authProvider = providerCookie?.value;
   
-  console.log('Token cookie check:', {
-    hasTokenCookie: !!tokenCookie,
-    hasExpiryCookie: !!expiryCookie,
-    authProvider,
-    currentTime: now,
-    cookieExpiresAt: expiresAt,
-    isValid: tokenCookie && expiresAt > now,
-    timeUntilExpiry: expiresAt > now ? expiresAt - now : 'expired'
-  });
   
   // Check if we have a valid cached token in cookies
   if (tokenCookie && expiresAt > now) {
-    console.log(`Using cached ${authProvider || 'unknown'} token from cookies`);
     return tokenCookie.value;
   }
   
@@ -123,18 +113,8 @@ async function getAuthToken(config: { apiBaseUrl: string; apiKey: string }): Pro
  * Search for flights using the MySeatMap backend API
  */
 export async function POST(request: NextRequest) {
-  console.log('=== FLIGHT SEARCH API START ===');
-  console.log('Environment check:', {
-    nodeEnv: process.env.NODE_ENV,
-    hasApiBaseUrl: !!process.env.API_BASE_URL,
-    hasApiKey: !!process.env.API_KEY,
-    hasEnvironment: !!process.env.ENVIRONMENT,
-    apiBaseUrlValue: process.env.API_BASE_URL,
-    environmentValue: process.env.ENVIRONMENT
-  });
 
   try {
-    console.log('Creating config from environment variables...');
     
     // Create config object directly from environment variables
     const apiBaseUrl = process.env.API_BASE_URL;
@@ -156,16 +136,8 @@ export async function POST(request: NextRequest) {
       isProduction: environment === 'production'
     };
     
-    console.log('Config created successfully:', {
-      apiBaseUrl: config.apiBaseUrl,
-      environment: config.environment,
-      isDevelopment: config.isDevelopment
-    });
-
     // Parse request body
-    console.log('Parsing request body...');
     const body: FlightSearchParams = await request.json();
-    console.log('Request body parsed successfully:', body);
     
     // Validate required fields
     if (!body.origin || !body.destination || !body.date) {
