@@ -73,6 +73,14 @@ export interface BookmarkItem {
   maxResults?: number;
   createdAt: string;
   expiresAt: string;
+  // Alert configuration fields
+  hasAlert?: boolean;
+  alertConfig?: {
+    alertThreshold: number;
+    lastEvaluated?: string;
+    lastTriggered?: string;
+    triggerHistory?: string;
+  };
 }
 
 interface SavedItemCardProps {
@@ -80,6 +88,8 @@ interface SavedItemCardProps {
   onRunSearch: (bookmark: BookmarkItem) => void
   onDeleteClick: (bookmark: BookmarkItem) => void
   onViewSeatMap?: (bookmark: BookmarkItem) => void
+  onSetAlert?: (bookmark: BookmarkItem) => void
+  onViewAlert?: (bookmark: BookmarkItem) => void
   seatMapLoading?: boolean
   parseFlightOffer: (flightOfferData: string) => { route: string; date: string; price?: string; flightNumber: string } | null
 }
@@ -89,6 +99,8 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
   onRunSearch,
   onDeleteClick,
   onViewSeatMap,
+  onSetAlert: _onSetAlert,
+  onViewAlert: _onViewAlert,
   seatMapLoading = false,
   parseFlightOffer
 }) => {
@@ -179,14 +191,24 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
                 )}
               </Button>
             )}
-            <Button 
-              disabled
-              variant="outline" 
-              className="rounded-full bg-transparent text-sm opacity-50 cursor-not-allowed"
-            >
-              <Bell className="w-4 h-4 mr-1" />
-              Add Alert
-            </Button>
+            {(bookmark.hasAlert || bookmark.alertConfig) ? (
+              <Button 
+                variant="outline" 
+                className="rounded-full bg-transparent text-sm text-teal-600 border-teal-600 cursor-not-allowed opacity-50"
+                disabled
+              >
+                <Bell className="w-4 h-4 mr-1" />
+                View Alert
+              </Button>
+            ) : (
+              <Button 
+                className="rounded-full text-sm bg-teal-600 text-white cursor-not-allowed opacity-50"
+                disabled
+              >
+                <Bell className="w-4 h-4 mr-1" />
+                Set Alert
+              </Button>
+            )}
             <Button 
               variant="outline" 
               className="rounded-full bg-transparent text-sm text-red-600 hover:text-red-700"

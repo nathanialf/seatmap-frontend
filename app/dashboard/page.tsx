@@ -247,6 +247,22 @@ export default function DashboardPage() {
     setBookmarkToDelete(null)
   }
 
+  // Function to handle setting an alert for a bookmark
+  const handleSetAlert = useCallback((bookmark: BookmarkItem) => {
+    // TODO: Implement alert creation dialog/modal
+    // For now, just log the action
+    console.log('Set alert for bookmark:', bookmark.bookmarkId, bookmark.title)
+    // You could navigate to an alert setup page, open a dialog, etc.
+  }, [])
+
+  // Function to handle viewing/managing an existing alert
+  const handleViewAlert = useCallback((bookmark: BookmarkItem) => {
+    // TODO: Implement alert viewing/management dialog/modal
+    // For now, just log the action
+    console.log('View alert for bookmark:', bookmark.bookmarkId, bookmark.alertConfig)
+    // You could navigate to an alert management page, open a dialog with alert details, etc.
+  }, [])
+
   // Function to parse flight offer data for display
   const parseFlightOffer = (flightOfferData: string) => {
     try {
@@ -319,7 +335,7 @@ export default function DashboardPage() {
 
   // Stats - real data for authenticated users, mock data for preview
   const realStats = [
-    { label: "Active Alerts", value: "COMING SOON", icon: Bell },
+    { label: "Active Alerts", value: bookmarksData?.bookmarks?.filter(b => b.hasAlert || b.alertConfig).length.toString() || "0", icon: Bell },
     { label: "Bookmarks", value: bookmarksData?.total?.toString() || "0", icon: Bookmark },
     { label: "Flights Saved", value: bookmarksData?.bookmarks?.filter(b => b.itemType === 'BOOKMARK').length.toString() || "0", icon: Plane },
     { label: "Saved Searches", value: bookmarksData?.bookmarks?.filter(b => b.itemType === 'SAVED_SEARCH').length.toString() || "0", icon: Search },
@@ -465,31 +481,29 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-16">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Dashboard
-                {!isRealDashboard && (
-                  <span className="ml-3 text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-normal">
-                    Preview Mode
-                  </span>
-                )}
-              </h1>
-              <p className="text-gray-600">
-                {isRealDashboard
-                  ? `Welcome back! Here's what's happening with your alerts.`
-                  : isUser
-                  ? "This is a preview of your dashboard. Real data will appear here when you have active alerts."
-                  : isGuest
-                  ? "This is a preview dashboard. Sign up for a full account to create alerts and track flights."
-                  : "This is a preview of what your dashboard will look like with active flight alerts."
-                }
-              </p>
-            </div>
+          <div className="text-center mb-16">
+            <h1 className="text-5xl font-bold text-gray-900 mb-4 text-balance">
+              Dashboard
+              {!isRealDashboard && (
+                <span className="ml-3 text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-normal">
+                  Preview Mode
+                </span>
+              )}
+            </h1>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto text-pretty">
+              {isRealDashboard
+                ? `Welcome back! Here's what's happening with your alerts.`
+                : isUser
+                ? "This is a preview of your dashboard. Real data will appear here when you have active alerts."
+                : isGuest
+                ? "This is a preview dashboard. Sign up for a full account to create alerts and track flights."
+                : "This is a preview of what your dashboard will look like with active flight alerts."
+              }
+            </p>
             {!isRealDashboard && (
-              <div className="flex gap-3 mt-4 md:mt-0">
+              <div className="flex gap-3 justify-center mt-6">
                 {isAuthenticated && (
                   <Button 
                     variant="outline" 
@@ -515,7 +529,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                    <p className={`font-bold ${stat.value === 'COMING SOON' ? 'text-lg text-teal-600' : 'text-3xl'}`}>{stat.value}</p>
+                    <p className={`font-bold ${stat.label === 'Active Alerts' ? 'text-3xl text-teal-600' : stat.value === 'COMING SOON' ? 'text-lg text-teal-600' : 'text-3xl'}`}>{stat.value}</p>
                   </div>
                   <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                     <stat.icon className="w-6 h-6 text-gray-600" />
@@ -632,6 +646,8 @@ export default function DashboardPage() {
                           onRunSearch={handleRunSearch}
                           onDeleteClick={handleDeleteClick}
                           onViewSeatMap={handleViewSeatMap}
+                          onSetAlert={handleSetAlert}
+                          onViewAlert={handleViewAlert}
                           seatMapLoading={loadingBookmarkId === bookmark.bookmarkId}
                           parseFlightOffer={parseFlightOffer}
                         />

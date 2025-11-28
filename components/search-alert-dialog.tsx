@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { MapPin, Calendar, Plane, Users, Clock, AlertTriangle } from 'lucide-react'
+import { MapPin, Calendar, Plane, Users, Clock } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -95,16 +95,6 @@ const SearchAlertDialog: React.FC<SearchAlertDialogProps> = ({
           {/* Alert Configuration (conditionally visible) */}
           {setAlert && (
             <div className="space-y-4 border border-gray-200 rounded-lg p-4">
-              {/* Under Construction Banner */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-medium text-amber-800 text-sm">Under Construction</h4>
-                    <p className="text-xs text-amber-700">Search alerts are currently being developed!</p>
-                  </div>
-                </div>
-              </div>
 
               <div className="bg-gradient-to-br from-[#00BBA7]/10 to-[#00BBA7]/5 border border-[#00BBA7]/30 rounded-lg p-3 space-y-1.5">
             <p className="font-semibold text-gray-600 uppercase tracking-wide mb-1.5 text-xs">Alert Details</p>

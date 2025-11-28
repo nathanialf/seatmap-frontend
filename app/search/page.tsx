@@ -319,6 +319,8 @@ export default function SearchPage() {
     try {
       logger.log('handleConfirmSearchAlert called with:', { bookmarkName, setAlert, alertSettings, isUser })
       
+      let bookmarkId: string | null = null
+      
       // Create bookmark with custom name
       if (isUser) {
         setIsSavingBookmark(true)
@@ -381,13 +383,35 @@ export default function SearchPage() {
         
         const result = await response.json()
         logger.log('Bookmark created successfully:', result)
+        bookmarkId = result.data?.bookmarkId
+        
+        // If alert was requested and bookmark was created successfully, configure the alert
+        if (setAlert && alertSettings && bookmarkId) {
+          logger.log('Configuring alert for bookmark:', bookmarkId, 'with threshold:', alertSettings.availabilityThreshold)
+          
+          const alertResponse = await fetch(`/api/bookmarks/${bookmarkId}/alert`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              alertThreshold: alertSettings.availabilityThreshold
+            }),
+          })
+          
+          if (!alertResponse.ok) {
+            const alertErrorText = await alertResponse.text()
+            logger.error('Alert configuration API error:', alertErrorText)
+            // Don't throw here - bookmark was created successfully, just alert config failed
+            logger.warn('Alert configuration failed but bookmark was saved successfully')
+          } else {
+            const alertResult = await alertResponse.json()
+            logger.log('Alert configured successfully:', alertResult)
+          }
+        }
       } else {
         logger.log('User not authenticated, skipping bookmark creation')
-      }
-
-      // If alert was requested, log the alert settings (since alerts are under construction)
-      if (setAlert && alertSettings) {
-        logger.log("[v0] Search alert set for:", searchParams, "Alert settings:", alertSettings)
       }
 
       setIsSearchAlertDialogOpen(false)
@@ -460,6 +484,8 @@ export default function SearchPage() {
 
   const handleConfirmAlert = async (bookmarkName: string, setAlert: boolean, alertSettings?: { seatCountThreshold: number }) => {
     try {
+      let bookmarkId: string | null = null
+      
       // Create bookmark with custom name
       if (isUser && selectedFlightForAlert !== null) {
         setSavingFlightBookmark(selectedFlightForAlert)
@@ -495,12 +521,34 @@ export default function SearchPage() {
           
           const result = await response.json()
           logger.log('Flight bookmark created successfully:', result)
+          bookmarkId = result.data?.bookmarkId
+          
+          // If alert was requested and bookmark was created successfully, configure the alert
+          if (setAlert && alertSettings && bookmarkId) {
+            logger.log('Configuring alert for flight bookmark:', bookmarkId, 'with threshold:', alertSettings.seatCountThreshold)
+            
+            const alertResponse = await fetch(`/api/bookmarks/${bookmarkId}/alert`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                alertThreshold: alertSettings.seatCountThreshold
+              }),
+            })
+            
+            if (!alertResponse.ok) {
+              const alertErrorText = await alertResponse.text()
+              logger.error('Alert configuration API error:', alertErrorText)
+              // Don't throw here - bookmark was created successfully, just alert config failed
+              logger.warn('Alert configuration failed but bookmark was saved successfully')
+            } else {
+              const alertResult = await alertResponse.json()
+              logger.log('Alert configured successfully:', alertResult)
+            }
+          }
         }
-      }
-
-      // If alert was requested, log the alert settings (since alerts are under construction)
-      if (setAlert && alertSettings) {
-        logger.log("[v0] Alert set for flight:", selectedFlightForAlert, "Alert settings:", alertSettings)
       }
 
       setIsAlertDialogOpen(false)
@@ -653,10 +701,10 @@ export default function SearchPage() {
       <div className="min-h-screen bg-gray-50">
         <Navbar />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Search Flights</h1>
-            <p className="text-gray-600">Find your perfect flight and track seat availability</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-16">
+            <h1 className="text-5xl font-bold text-gray-900 mb-4 text-balance">Search Flights</h1>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto text-pretty">Find your perfect flight and track seat availability</p>
           </div>
 
           <FlightSearchForm
