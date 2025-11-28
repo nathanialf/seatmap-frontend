@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -41,6 +41,13 @@ export default function DashboardPage() {
   const [loadingBookmarkId, setLoadingBookmarkId] = useState<string | null>(null)
   const router = useRouter()
   const { isAuthenticated, isUser, isGuest, isLoading, hasFreeTier } = useAuth()
+
+  // Scroll to top when seat map viewer becomes visible
+  React.useEffect(() => {
+    if (selectedBookmarkForSeatMap !== null) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [selectedBookmarkForSeatMap])
 
   // Function to run a saved search
   const handleRunSearch = useCallback((bookmark: BookmarkItem) => {

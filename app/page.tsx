@@ -946,12 +946,10 @@ export default function HomePage() {
   const handleDragStart = (clientX: number) => {
     setIsDragging(true)
     setStartX(clientX)
-    setCurrentX(clientX)
   }
 
   const handleDragMove = (clientX: number) => {
     if (!isDragging) return
-    setCurrentX(clientX)
     setDragOffset(clientX - startX)
   }
 
@@ -969,7 +967,6 @@ export default function HomePage() {
 
     setDragOffset(0)
     setStartX(0)
-    setCurrentX(0)
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
