@@ -31,7 +31,7 @@ export async function GET(
     }
 
     // Make request to backend API (publicly accessible endpoint)
-    const response = await fetch(`${config.apiBaseUrl}/tiers/${tierName}`, {
+    const response = await fetch(`${config.apiBaseUrl}/tiers/${tierName}?region=US`, {
       method: 'GET',
       headers: {
         'X-API-Key': config.apiKey,
