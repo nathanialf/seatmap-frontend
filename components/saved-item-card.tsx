@@ -194,8 +194,9 @@ const SavedItemCard: React.FC<SavedItemCardProps> = ({
             {(bookmark.hasAlert || bookmark.alertConfig) ? (
               <Button 
                 variant="outline" 
-                className="rounded-full bg-transparent text-sm text-teal-600 border-teal-600 cursor-not-allowed opacity-50"
-                disabled
+                className="rounded-full bg-transparent text-sm text-teal-600 border-teal-600 hover:bg-teal-50 cursor-pointer"
+                onClick={() => _onViewAlert && _onViewAlert(bookmark)}
+                disabled={!_onViewAlert}
               >
                 <Bell className="w-4 h-4 mr-1" />
                 View Alert
